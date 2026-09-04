@@ -1,0 +1,23 @@
+# python
+backend/.venv/
+backend/data/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+# node
+node_modules/
+frontend/dist/
+desktop/src-tauri/target/
+# models / outputs
+*.pth
+*.safetensors
+*.glb
+*.tif
+*.tiff
+!backend/tests/fixtures/*.tif
+# misc
+.DS_Store
+.env
