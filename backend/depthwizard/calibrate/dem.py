@@ -1,7 +1,10 @@
 """Coarse global DEM access (Copernicus GLO-30 by default, SRTM v3 / NASADEM optional)."""
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
+from pathlib import Path
 
 import numpy as np
 import rasterio
@@ -12,17 +15,46 @@ from rasterio.warp import Resampling, reproject
 log = logging.getLogger(__name__)
 
 
-def fetch_dem(bounds4326: tuple[float, float, float, float], source: str = "glo_30"):
-    """Return (array, profile) of the DEM covering bounds (W, S, E, N in EPSG:4326)."""
-    from dem_stitcher import stitch_dem
+def _cache_dir() -> Path:
+    from ..config import settings
 
+    d = Path(settings.data_dir) / "dem_cache"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def fetch_dem(bounds4326: tuple[float, float, float, float], source: str = "glo_30"):
+    """Return (array, profile) of the DEM covering bounds (W, S, E, N in EPSG:4326).
+
+    Results are cached on disk per (source, bounds rounded to ~10 m) because stitching the global
+    tiles is by far the slowest step of the pipeline.
+    """
     w, s, e, n = bounds4326
     pad = 0.002  # ~200 m so bilinear resampling has support at the edges
-    arr, profile = stitch_dem([w - pad, s - pad, e + pad, n + pad], dem_name=source,
-                              dst_ellipsoidal_height=False, dst_area_or_point="Point")
+    box = [round(w - pad, 4), round(s - pad, 4), round(e + pad, 4), round(n + pad, 4)]
+    key = hashlib.sha1(json.dumps([source, box]).encode()).hexdigest()[:16]
+    cache = _cache_dir() / f"{source}_{key}.tif"
+    if cache.exists():
+        with rasterio.open(cache) as ds:
+            arr = ds.read(1).astype(np.float32)
+            arr[arr == ds.nodata] = np.nan
+            return arr, {"transform": ds.transform, "crs": ds.crs, "nodata": ds.nodata}
+
+    from dem_stitcher import stitch_dem
+
+    arr, profile = stitch_dem(box, dem_name=source, dst_ellipsoidal_height=False,
+                              dst_area_or_point="Point")
     arr = arr.astype(np.float32)
     if profile.get("nodata") is not None:
         arr[arr == profile["nodata"]] = np.nan
+    try:
+        with rasterio.open(cache, "w", driver="GTiff", height=arr.shape[0], width=arr.shape[1],
+                           count=1, dtype="float32", crs=profile["crs"],
+                           transform=profile["transform"], nodata=-32768.0,
+                           compress="deflate") as ds:
+            ds.write(np.where(np.isfinite(arr), arr, -32768.0).astype(np.float32), 1)
+    except Exception as exc:  # cache is best-effort
+        log.warning("could not cache DEM: %s", exc)
     return arr, profile
 
 

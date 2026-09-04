@@ -17,7 +17,12 @@ export function UploadPanel() {
   const [busy, setBusy] = useState(false)
   const input = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { api.listJobs().then((j) => set({ jobs: j })).catch(() => undefined) }, [set])
+  useEffect(() => {
+    const load = () => api.listJobs().then((j) => set({ jobs: j })).catch(() => undefined)
+    load()
+    const t = setInterval(load, 5000)
+    return () => clearInterval(t)
+  }, [set])
 
   const submit = useCallback(async (file: File) => {
     setBusy(true)

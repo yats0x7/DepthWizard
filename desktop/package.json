@@ -1,0 +1,24 @@
+{
+  "name": "depthwizard-desktop",
+  "productName": "DepthWizard",
+  "version": "0.1.0",
+  "description": "Single-view satellite height estimation and 3D flythrough (SIH 2026, PS 26175)",
+  "author": "Yatharth",
+  "license": "MIT",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "DW_DEV=1 electron .",
+    "build:web": "pnpm --dir ../frontend build",
+    "dist": "pnpm build:web && electron-builder --config electron-builder.yml",
+    "dist:mac": "pnpm build:web && electron-builder --mac --config electron-builder.yml",
+    "dist:win": "pnpm build:web && electron-builder --win --config electron-builder.yml",
+    "dist:linux": "pnpm build:web && electron-builder --linux --config electron-builder.yml"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "pnpm": { "onlyBuiltDependencies": ["electron"] }
+}
