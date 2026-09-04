@@ -1,6 +1,6 @@
 # DepthWizard - execution state
 
-Status: active | Phase: 1 (scaffold) | Mode: deep
+Status: active (restarted 2026-09-05 after Electron decision) | Phase: 5 (verification + packaging) | Mode: deep
 
 ## Active truth
 - `/goal` (rendered 2026-09-05) - outcome and gates
@@ -25,9 +25,18 @@ Status: active | Phase: 1 (scaffold) | Mode: deep
 1. Backend pipeline: PNG/JPG -> rDSM, GeoTIFF -> metric DSM (SRTM-calibrated), GeoTIFF + GLB + PNG outputs. Unit tests pass.
 2. API: FastAPI upload -> job -> results, validation endpoint with RMSE/MAE/r.
 3. Frontend: upload, 3D viewer with first-person flythrough, height probe, slope, flood, profile, validation panel. Builds with no type errors.
-4. Standalone: Docker compose for the stack plus Tauri/Electron desktop wrapper config.
+4. Standalone: Docker compose for the stack plus an Electron desktop app that launches the API and opens the UI.
 5. Docs: README with setup, architecture, evaluation instructions.
 6. Independent review complete, no unresolved high-severity finding.
 
+## Decisions since start
+- Desktop wrapper is Electron, not Tauri (user decision). Remove desktop/src-tauri.
+- Real Landsat run exposed nodata halos and unbounded prior scaling; fixed in calibrate/fit.py, tests still pass.
+- Sample data: backend/data/samples/landsat_rgb.tif (flat Bahamas scene, weak demo) and oam_urban.tif (3 cm drone crop, Dar es Salaam, EPSG:32737, good demo).
+
+## Progress
+- Gate 1 backend: 14 tests pass. Gate 2 API: done. Gate 3 frontend: builds clean, browser check pending. Gate 4 packaging: Docker written, Electron pending. Gate 5 README: written. Gate 6 review: pending.
+- GitHub: private repo yats0x7/DepthWizard, branch main. Commits carry no AI attribution (user rule).
+
 ## Next action
-Scaffold backend (uv) and frontend (Vite + React + TS).
+Replace desktop/ with the Electron app, run the urban sample, drive the web app in the browser and fix issues, commit, then 3 independent reviews.

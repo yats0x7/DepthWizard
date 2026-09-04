@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -36,3 +37,39 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def ensure_ca_bundle() -> None:
+    """Some Python builds (notably python.org macOS installers) ship without a CA bundle, which
+    breaks Hugging Face, DEM and GDAL downloads. Point the common variables at certifi."""
+    if os.environ.get("SSL_CERT_FILE"):
+        return
+    try:
+        import certifi
+
+        ca = certifi.where()
+    except Exception:  # pragma: no cover
+        return
+    for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+        os.environ.setdefault(var, ca)
+
+
+ensure_ca_bundle()
+
+
+def ensure_ca_bundle() -> None:
+    """Some Python builds (notably python.org macOS installers) ship without a CA bundle, which
+    breaks Hugging Face, DEM and GDAL downloads. Point the common variables at certifi."""
+    if os.environ.get("SSL_CERT_FILE"):
+        return
+    try:
+        import certifi
+
+        ca = certifi.where()
+    except Exception:  # pragma: no cover
+        return
+    for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+        os.environ.setdefault(var, ca)
+
+
+ensure_ca_bundle()

@@ -1,30 +1,35 @@
 # DepthWizard TODO
 
 ## Phase 1 - scaffold
-- [ ] backend pyproject, package skeleton, config
-- [ ] frontend Vite scaffold with deps
+- [x] backend pyproject, package skeleton, config
+- [x] frontend Vite scaffold with deps
 
 ## Phase 2 - backend pipeline
-- [ ] io: load PNG/JPG/GeoTIFF, write GeoTIFF/PNG
-- [ ] depth: HF Depth Anything V2 backbone, tiling, device auto
-- [ ] calibrate: relative height, SRTM fetch, RANSAC fit, GCP, priors
-- [ ] mesh: GLB export
-- [ ] eval: metrics
-- [ ] tests (synthetic rasters, backbone mocked)
+- [x] io: load PNG/JPG/GeoTIFF, write GeoTIFF/PNG
+- [x] depth: HF Depth Anything V2 backbone, tiling, device auto
+- [x] calibrate: relative height, SRTM fetch, RANSAC fit, GCP, priors
+- [x] mesh: GLB export
+- [x] eval: metrics
+- [x] tests (synthetic rasters, backbone mocked)
 
 ## Phase 3 - API + CLI
-- [ ] FastAPI: POST /jobs, GET /jobs/{id}, GET files, POST /jobs/{id}/validate
-- [ ] Typer CLI: `depthwizard run image.tif --out dir`
+- [x] FastAPI: POST /jobs, GET /jobs/{id}, GET files, POST /jobs/{id}/validate
+- [x] Typer CLI: `depthwizard run image.tif --out dir`
 
 ## Phase 4 - frontend
-- [ ] upload + job status
-- [ ] viewer: geotiff -> martini mesh -> textured terrain
-- [ ] first-person controls, probe, slope, flood, profile, validation panel
+- [x] upload + job status
+- [x] viewer: geotiff -> martini mesh -> textured terrain
+- [x] first-person controls, probe, slope, flood, profile, validation panel
 
 ## Phase 5 - packaging + docs
-- [ ] Dockerfiles + compose
-- [ ] Tauri desktop config
-- [ ] README
+- [x] Dockerfiles + compose
+- [ ] Electron desktop app (main process spawns API, loads UI, electron-builder config) replacing the Tauri draft
+- [x] README
 
 ## Phase 6 - review
 - [ ] 3 independent reviewers, fix findings, final commit
+
+## Phase 5b - real-data verification
+- [x] run real model on Landsat GeoTIFF (found and fixed calibration outliers)
+- [ ] run real model on the urban aerial crop (data/samples/oam_urban.tif)
+- [ ] drive the web app in the browser and fix UX issues

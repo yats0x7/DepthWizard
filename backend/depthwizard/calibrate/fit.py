@@ -13,7 +13,37 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 
 import numpy as np
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import distance_transform_edt, gaussian_filter
+
+
+def lowpass_nan(arr: np.ndarray, sigma: float) -> np.ndarray:
+    """Gaussian low-pass that ignores NaN (normalised convolution), so nodata edges create no halos."""
+    valid = np.isfinite(arr)
+    num = gaussian_filter(np.where(valid, arr, 0.0).astype(np.float32), sigma)
+    den = gaussian_filter(valid.astype(np.float32), sigma)
+    out = np.full(arr.shape, np.nan, np.float32)
+    ok = den > 1e-3
+    out[ok] = num[ok] / den[ok]
+    return out
+
+
+def fill_nearest(arr: np.ndarray) -> np.ndarray:
+    """Fill NaN with the nearest valid value (for DEM gaps such as ocean or tile seams)."""
+    valid = np.isfinite(arr)
+    if valid.all():
+        return arr
+    if not valid.any():
+        return np.zeros_like(arr)
+    idx = distance_transform_edt(~valid, return_distances=False, return_indices=True)
+    return arr[tuple(idx)]
+
+
+def _clip_structure(structure: np.ndarray) -> np.ndarray:
+    v = structure[np.isfinite(structure)]
+    if v.size < 16:
+        return structure
+    lo, hi = np.percentile(v, [0.2, 99.8])
+    return np.clip(structure, lo, hi)
 
 
 @dataclass
@@ -94,8 +124,7 @@ def calibrate(rel: np.ndarray, dem: np.ndarray | None, pixel_size_m: tuple[float
     if dem is None or mode == "prior":
         px = pixel_size_m[0] if pixel_size_m else 1.0
         sigma = max(2.0, dem_res_m / px)
-        base = gaussian_filter(np.nan_to_num(rel, nan=float(np.nanmean(rel))), sigma)
-        structure = rel - base
+        structure = _clip_structure(rel - lowpass_nan(rel, sigma))
         a = _prior_scale(structure, prior_p95_m)
         dsm = a * rel
         cal.mode, cal.scale, cal.used_prior, cal.n = "prior", a, True, int(valid.sum())
@@ -106,15 +135,14 @@ def calibrate(rel: np.ndarray, dem: np.ndarray | None, pixel_size_m: tuple[float
     valid &= np.isfinite(dem)
     px = pixel_size_m[0] if pixel_size_m else 1.0
     sigma = max(2.0, dem_res_m / px)  # DEM cell size in working pixels
-    filled = np.nan_to_num(rel, nan=float(np.nanmean(rel[np.isfinite(rel)])))
-    rel_lp = gaussian_filter(filled, sigma)
+    rel_lp = lowpass_nan(rel, sigma)
     relief = float(np.nanpercentile(dem, 98) - np.nanpercentile(dem, 2))
 
     if mode == "affine":
         a, b, r2, n = _ransac_affine(rel_lp[valid], dem[valid])
         cal.r2, cal.n = r2, n
         if a <= 0 or r2 < min_r2 or relief < min_relief_m:
-            a = _prior_scale(rel - rel_lp, prior_p95_m)
+            a = _prior_scale(_clip_structure(rel - rel_lp), prior_p95_m)
             b = float(np.nanmean(dem[valid]) - a * np.nanmean(rel[valid]))
             cal.used_prior = True
             cal.notes.append(f"affine fit unreliable (r2={r2:.2f}, relief={relief:.1f} m); prior scale")
@@ -126,12 +154,12 @@ def calibrate(rel: np.ndarray, dem: np.ndarray | None, pixel_size_m: tuple[float
     # hybrid
     a, b, r2, n = _ransac_affine(rel_lp[valid], dem[valid])
     cal.r2, cal.n = r2, n
-    structure = rel - rel_lp
+    structure = _clip_structure(rel - rel_lp)
     if a <= 0 or r2 < min_r2 or relief < min_relief_m:
         a = _prior_scale(structure, prior_p95_m)
         cal.used_prior = True
         cal.notes.append(f"terrain fit weak (r2={r2:.2f}, relief={relief:.1f} m); structural scale from prior")
-    dem_filled = np.where(np.isfinite(dem), dem, np.nanmean(dem))
+    dem_filled = fill_nearest(dem)
     dsm = dem_filled + a * structure
     cal.scale, cal.offset = a, 0.0
     cal.notes.append("hybrid: DEM terrain + model structure")

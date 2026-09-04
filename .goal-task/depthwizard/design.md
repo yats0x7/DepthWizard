@@ -3,7 +3,7 @@
 ## Layout (monorepo)
 - `backend/` Python 3.12 package `depthwizard` managed with uv. FastAPI API + Typer CLI.
 - `frontend/` Vite + React 19 + TypeScript + Tailwind + react-three-fiber + drei + zustand + geotiff.js + @mapbox/martini.
-- `desktop/` Tauri config wrapping the built frontend and spawning the backend.
+- `desktop/` Electron app (electron-builder) that spawns the Python API as a child process and loads the web app from it. Electron chosen over Tauri: bundled Chromium gives consistent WebGL2 for the three.js viewer on every OS and packaging needs no Rust toolchain.
 - `docker/` Dockerfiles and compose.
 
 ## Pipeline
@@ -19,6 +19,12 @@
 - Controls: orbit (default) and first-person (PointerLock, WASD + mouse, shift to sprint, Q/E vertical).
 - Tools: height probe (raycast), slope shading toggle, flood level slider (water plane), cross-section profile (two clicks -> chart), validation panel (upload reference -> metrics), vertical exaggeration.
 - State in zustand; API client with fetch; dark UI with Tailwind.
+
+## Calibration robustness (added after the Landsat run)
+- Low-pass filtering is NaN-aware (normalised convolution) so nodata borders create no halos.
+- The structure term is clipped to its 0.2-99.8 percentile range before scaling.
+- DEM gaps are filled with the nearest valid value, not the mean.
+- The package sets SSL_CERT_FILE / REQUESTS_CA_BUNDLE / CURL_CA_BUNDLE to certifi when unset.
 
 ## Invariants
 - Output GeoTIFF: Float32, nodata = -9999, CRS and transform copied from input; relative DSM for non-georeferenced input written as plain TIFF + 16-bit PNG.
