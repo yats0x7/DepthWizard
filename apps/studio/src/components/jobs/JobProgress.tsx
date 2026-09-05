@@ -26,7 +26,7 @@ export function JobProgress({ job }: { job: Job }) {
       </div>
       <Progress value={pct} active className="h-2" />
       <ol className="flex w-full items-center justify-between">
-        {STAGES.slice(0, 6).map((s, i) => {
+        {STAGES.slice(0, 7).map((s, i) => {
           const done = i < idx || job.status === 'done'
           const current = i === idx && job.status === 'running'
           return (

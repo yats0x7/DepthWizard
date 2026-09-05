@@ -44,17 +44,23 @@ def run(
     image: Path,
     out: Path = typer.Option(Path("out"), "--out", "-o"),
     model: str | None = typer.Option(None, help="small | base | large | HF id"),
-    calibration: str | None = typer.Option(None, help="hybrid | affine | prior"),
+    calibration: str | None = typer.Option(None, help="hybrid | affine | prior | semantic"),
     dem: str | None = typer.Option(None, "--dem", help="terrarium | glo_30 | srtm_v3 | nasadem"),
     gcps: Path | None = typer.Option(None, help="JSON list of {row, col, z}"),
     prior: float | None = typer.Option(None, help="scene prior: p95 structural height in metres"),
+    semantic_prior: bool = typer.Option(False, "--semantic-prior", help="enable the opt-in flat-surface prior"),
 ) -> None:
     """Image (PNG/JPG/GeoTIFF) -> DSM + heightmap + preview + GLB."""
     from .pipeline import RunOptions
     from .pipeline import run as run_pipeline
 
     opts = RunOptions(
-        model=model, calibration=calibration, dem_source=dem, gcps=_gcps(gcps), prior_p95_m=prior
+        model=model,
+        calibration=calibration,
+        dem_source=dem,
+        gcps=_gcps(gcps),
+        prior_p95_m=prior,
+        semantic_prior=semantic_prior,
     )
     with Progress(
         TextColumn("{task.description}"),
@@ -143,11 +149,12 @@ def benchmark_run_command(
 def benchmark_report_command(
     root: Path = typer.Option(Path("data/benchmark"), "--root", "-r"),
     output: Path = typer.Option(Path("docs/BENCHMARK.md"), "--output", "-o"),
+    compare_root: Path | None = typer.Option(None, "--compare-root", help="optional second run for an A/B comparison"),
 ) -> None:
     """Generate the per-scene and per-landscape benchmark Markdown table."""
     from .benchmark.runner import benchmark_report
 
-    path = benchmark_report(root, output)
+    path = benchmark_report(root, output, compare_root=compare_root)
     console.print(f"[green]wrote[/] {path}")
 
 

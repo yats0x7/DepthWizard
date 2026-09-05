@@ -50,6 +50,29 @@ def test_prior_mode_without_dem():
     assert np.isfinite(dsm).all()
 
 
+def test_semantic_prior_pins_flat_surfaces_and_keeps_structure_above():
+    h, w = 80, 100
+    y, x = np.mgrid[0:h, 0:w]
+    dem = (150 + 0.4 * y + 0.1 * x).astype(np.float32)
+    rel = (0.2 + 0.002 * y + 0.001 * x).astype(np.float32)
+    rel[30:40, 40:60] += 0.35
+    flat = np.ones((h, w), bool)
+    flat[30:40, 40:60] = False
+    dsm, cal = calibrate(rel, dem, (2.0, 2.0), mode="semantic", flat_mask=flat, prior_p95_m=20)
+    assert cal.mode == "semantic"
+    assert any("pinned" in note for note in cal.notes)
+    assert np.nanmedian(np.abs(dsm[flat] - dem[flat])) < 1.0
+    assert dsm[35, 50] > dsm[35, 20] + 1.0
+
+
+def test_semantic_prior_explicitly_falls_back_without_support():
+    rel = np.random.default_rng(2).uniform(0, 1, (60, 60)).astype(np.float32)
+    dem = np.full_like(rel, 100)
+    dsm, cal = calibrate(rel, dem, (10.0, 10.0), mode="semantic", flat_mask=np.zeros_like(rel, bool))
+    assert cal.mode == "semantic" and np.isfinite(dsm).all()
+    assert any("fallback" in note for note in cal.notes)
+
+
 def test_gcps_refit():
     y, x = np.mgrid[0:60, 0:60]
     dsm = (5 + 0.1 * y + 0.05 * x).astype(np.float32)

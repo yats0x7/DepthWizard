@@ -19,15 +19,17 @@ from sse_starlette.sse import EventSourceResponse
 from .. import __version__
 from ..config import DEM_SOURCES, MODEL_PRESETS, Settings
 from ..config import settings as default_settings
+from ..imagery.sources import ImageryItem, validate_item
+from ..imagery.sources import search as search_imagery
 from ..pipeline import OUTPUT_FILES, RunOptions, recalibrate, validate
 from .jobs import JobManager, parse_gcps
-from .schemas import PathRequest, RecalibrateRequest, SampleRequest
+from .schemas import AreaJobRequest, ImagerySearchRequest, PathRequest, RecalibrateRequest, SampleRequest
 
 log = logging.getLogger(__name__)
 ALLOWED = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".geotiff", ".jp2", ".img"}
 GEO_EXT = {".tif", ".tiff", ".geotiff", ".jp2", ".img"}
 REFERENCE_ALLOWED = {".tif", ".tiff", ".geotiff", ".img", ".png"}
-CALIBRATIONS = ("hybrid", "affine", "prior")
+CALIBRATIONS = ("hybrid", "affine", "prior", "semantic")
 MAX_UPLOAD = 1024 * 1024 * 1024  # 1 GB
 TERMINAL = ("done", "failed", "cancelled")
 
@@ -70,7 +72,9 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
         shutil.rmtree(tmp.parent, ignore_errors=True)
         return dest
 
-    def parse_options(model, calibration, dem_source, prior_p95_m, gcps: str | None = None) -> RunOptions:
+    def parse_options(
+        model, calibration, dem_source, prior_p95_m, semantic_prior=False, gcps: str | None = None
+    ) -> RunOptions:
         if model and model not in MODEL_PRESETS and model != cfg.model:
             raise HTTPException(422, f"unknown model preset {model}; choose one of {sorted(MODEL_PRESETS)}")
         if dem_source and dem_source not in DEM_SOURCES:
@@ -90,6 +94,7 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
             calibration=calibration or None,
             dem_source=dem_source or None,
             prior_p95_m=prior_p95_m,
+            semantic_prior=bool(semantic_prior),
             gcps=parsed,
         )
 
@@ -156,9 +161,10 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
         calibration: str | None = Form(None),
         dem_source: str | None = Form(None),
         prior_p95_m: float | None = Form(None),
+        semantic_prior: bool = Form(False),
         gcps: str | None = Form(None),
     ) -> dict:
-        opts = parse_options(model, calibration, dem_source, prior_p95_m, gcps)
+        opts = parse_options(model, calibration, dem_source, prior_p95_m, semantic_prior, gcps)
         tmp = await save_upload(file, ALLOWED)
         return jobs.submit(tmp, Path(file.filename).name, opts)
 
@@ -176,12 +182,38 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
             if p.is_file() and p.suffix.lower() in ALLOWED
         ]
 
+    @app.post("/api/imagery/search")
+    def imagery_search(req: ImagerySearchRequest) -> list[dict]:
+        if len(req.bbox) != 4 or req.bbox[0] >= req.bbox[2] or req.bbox[1] >= req.bbox[3]:
+            raise HTTPException(422, "bbox must be [west, south, east, north] with positive area")
+        try:
+            return [
+                item.to_dict()
+                for item in search_imagery(
+                    tuple(req.bbox), tuple(req.sources), req.months, req.max_cloud, req.limit
+                )
+            ]
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(502, f"imagery search failed: {exc}") from exc
+
+    @app.post("/api/jobs/from-area", status_code=202)
+    def create_from_area(req: AreaJobRequest) -> dict:
+        if len(req.bbox) != 4 or req.bbox[0] >= req.bbox[2] or req.bbox[1] >= req.bbox[3]:
+            raise HTTPException(422, "bbox must be [west, south, east, north] with positive area")
+        try:
+            item = ImageryItem(**req.item.model_dump())
+            validate_item(item)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(422, f"invalid imagery item: {exc}") from exc
+        opts = parse_options(req.model, req.calibration, req.dem_source, req.prior_p95_m, req.semantic_prior)
+        return jobs.submit_area(item, tuple(req.bbox), opts)
+
     @app.post("/api/jobs/from-sample", status_code=202)
     def create_from_sample(req: SampleRequest) -> dict:
         src = samples_dir() / Path(req.name).name
         if not src.is_file() or src.suffix.lower() not in ALLOWED:
             raise HTTPException(404, "sample not found")
-        opts = parse_options(req.model, req.calibration, req.dem_source, req.prior_p95_m)
+        opts = parse_options(req.model, req.calibration, req.dem_source, req.prior_p95_m, req.semantic_prior)
         tmp = Path(tempfile.mkdtemp(prefix="dw-sample-")) / src.name
         shutil.copy2(src, tmp)
         return jobs.submit(tmp, src.name, opts)
@@ -194,7 +226,7 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
         src = Path(req.path).expanduser()
         if not src.is_file() or src.suffix.lower() not in ALLOWED:
             raise HTTPException(404, "file not found or unsupported")
-        opts = parse_options(req.model, req.calibration, req.dem_source, req.prior_p95_m)
+        opts = parse_options(req.model, req.calibration, req.dem_source, req.prior_p95_m, req.semantic_prior)
         tmp = Path(tempfile.mkdtemp(prefix="dw-path-")) / src.name
         shutil.copy2(src, tmp)
         return jobs.submit(tmp, src.name, opts)

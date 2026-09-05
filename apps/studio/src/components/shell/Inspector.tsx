@@ -4,6 +4,7 @@ import { ViewPanel } from '../panels/ViewPanel'
 import { AnalysePanel } from '../panels/AnalysePanel'
 import { ValidatePanel } from '../panels/ValidatePanel'
 import { DataPanel } from '../panels/DataPanel'
+import { MapPanel } from '../panels/MapPanel'
 
 export function Inspector() {
   const panel = useStore((s) => s.panel)
@@ -21,6 +22,7 @@ export function Inspector() {
             { value: 'analyse', label: 'Analyse' },
             { value: 'validate', label: 'Validate' },
             { value: 'data', label: 'Data' },
+            { value: 'map', label: 'Map' },
           ]}
         />
       </div>
@@ -29,6 +31,7 @@ export function Inspector() {
         {panel === 'analyse' && <AnalysePanel />}
         {panel === 'validate' && <ValidatePanel />}
         {panel === 'data' && <DataPanel />}
+        {panel === 'map' && <MapPanel />}
       </div>
     </aside>
   )

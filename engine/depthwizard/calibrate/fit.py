@@ -84,7 +84,7 @@ class GCP:
 
 @dataclass
 class Calibration:
-    mode: str  # relative | hybrid | affine | prior | gcp
+    mode: str  # relative | hybrid | affine | prior | semantic | gcp
     scale: float = 1.0
     offset: float = 0.0
     r2: float | None = None
@@ -156,12 +156,25 @@ def calibrate(
     min_r2: float = 0.3,
     min_relief_m: float = 5.0,
     dem_res_m: float = 30.0,
+    flat_mask: np.ndarray | None = None,
 ) -> tuple[np.ndarray, Calibration]:
     """Convert relative height to metric elevation. Returns (dsm, calibration)."""
     cal = Calibration(mode=mode)
     valid = np.isfinite(rel)
     px = pixel_size_m[0] if pixel_size_m else 1.0
     sigma = max(2.0, dem_res_m / px)  # one DEM cell expressed in working pixels
+
+    if mode == "semantic":
+        return _calibrate_semantic(
+            rel,
+            dem,
+            pixel_size_m,
+            flat_mask,
+            prior_p95_m,
+            min_r2,
+            min_relief_m,
+            dem_res_m,
+        )
 
     if dem is None or mode == "prior":
         structure = clip_structure(rel - ground_trend(rel, sigma))
@@ -201,6 +214,91 @@ def calibrate(
     cal.mode, cal.scale, cal.offset = "hybrid", a, 0.0
     cal.notes.append("hybrid: DEM terrain trend + model structure")
     dsm[~np.isfinite(rel)] = np.nan
+    return dsm.astype(np.float32), cal
+
+
+def _fit_ground_plane(dem: np.ndarray, flat: np.ndarray) -> np.ndarray | None:
+    ys, xs = np.nonzero(flat & np.isfinite(dem))
+    if len(xs) < 32:
+        return None
+    h, w = dem.shape
+    x = (xs - (w - 1) / 2) / max(w, 1)
+    y = (ys - (h - 1) / 2) / max(h, 1)
+    design = np.column_stack((x, y, np.ones_like(x)))
+    coef, *_ = np.linalg.lstsq(design, dem[ys, xs], rcond=None)
+    yy, xx = np.mgrid[0:h, 0:w]
+    return (
+        coef[0] * ((xx - (w - 1) / 2) / max(w, 1))
+        + coef[1] * ((yy - (h - 1) / 2) / max(h, 1))
+        + coef[2]
+    ).astype(np.float32)
+
+
+def _calibrate_semantic(
+    rel: np.ndarray,
+    dem: np.ndarray | None,
+    pixel_size_m: tuple[float, float] | None,
+    flat_mask: np.ndarray | None,
+    prior_p95_m: float,
+    min_r2: float,
+    min_relief_m: float,
+    dem_res_m: float,
+) -> tuple[np.ndarray, Calibration]:
+    """Calibrate with flat-surface constraints while keeping the old routes untouched."""
+    valid = np.isfinite(rel) & (np.isfinite(dem) if dem is not None else True)
+    flat = np.asarray(flat_mask, dtype=bool) if flat_mask is not None else np.zeros(rel.shape, bool)
+    if flat.shape != rel.shape:
+        raise ValueError("flat_mask must have the same shape as rel")
+    flat &= valid
+    if int(flat.sum()) < 32:
+        dsm, fallback = calibrate(
+            rel,
+            dem,
+            pixel_size_m,
+            mode="hybrid" if dem is not None else "prior",
+            prior_p95_m=prior_p95_m,
+            min_r2=min_r2,
+            min_relief_m=min_relief_m,
+            dem_res_m=dem_res_m,
+        )
+        fallback.mode = "semantic"
+        fallback.notes.insert(0, f"semantic prior unavailable ({int(flat.sum())} flat pixels); used fallback route")
+        return dsm, fallback
+
+    px = pixel_size_m[0] if pixel_size_m else 1.0
+    sigma = max(2.0, dem_res_m / px)
+    trend = ground_trend(rel, sigma)
+    structure = np.maximum(clip_structure(rel - trend), 0.0)
+    structure[flat] = 0.0
+    cal = Calibration(mode="semantic", n=int(valid.sum()))
+
+    if dem is None:
+        datum = float(np.nanmedian(rel[flat]))
+        a = prior_scale(structure, prior_p95_m)
+        dsm = a * (rel - datum)
+        dsm[~valid] = np.nan
+        cal.scale, cal.offset, cal.used_prior = a, -a * datum, True
+        cal.notes.append("semantic prior: candidate flat surfaces define the local zero plane")
+        cal.notes.append("no DEM: structural scale uses the scene prior, so absolute datum is unknown")
+        return dsm.astype(np.float32), cal
+
+    ground = _fit_ground_plane(dem, flat)
+    if ground is None:
+        # The count check above protects normal use; retain a defensive fallback for degenerate masks.
+        return _calibrate_semantic(rel, dem, pixel_size_m, None, prior_p95_m, min_r2, min_relief_m, dem_res_m)
+    residual = dem - ground
+    fit = valid & ~flat & (structure > 1e-5) & np.isfinite(residual)
+    a, _b, r2, n = ransac_affine(structure[fit], residual[fit]) if int(fit.sum()) >= 32 else (0.0, 0.0, 0.0, int(fit.sum()))
+    relief = float(np.nanpercentile(dem[valid], 98) - np.nanpercentile(dem[valid], 2)) if valid.any() else 0.0
+    if a <= 0 or r2 < min_r2 or relief < min_relief_m:
+        a = prior_scale(structure, prior_p95_m)
+        cal.used_prior = True
+        cal.notes.append(f"semantic structure fit weak (r2={r2:.2f}, relief={relief:.1f} m); prior scale")
+    cal.scale, cal.r2, cal.n = a, r2, n
+    dsm = ground + a * structure
+    dsm[~valid] = np.nan
+    cal.notes.append(f"semantic prior: {int(flat.sum())} flat pixels pinned to a fitted local ground plane")
+    cal.notes.append("positive model structure is retained above the constrained ground plane")
     return dsm.astype(np.float32), cal
 
 

@@ -15,6 +15,7 @@ from pathlib import Path
 from ..calibrate.fit import GCP
 from ..config import Settings
 from ..config import settings as default_settings
+from ..imagery.sources import ImageryItem, fetch_area
 from ..pipeline import JobCancelled, RunOptions, run
 
 log = logging.getLogger(__name__)
@@ -121,6 +122,7 @@ class JobManager:
                 "calibration": options.calibration,
                 "dem_source": options.dem_source,
                 "prior_p95_m": options.prior_p95_m,
+                "semantic_prior": options.semantic_prior,
                 "gcps": len(options.gcps),
             },
         }
@@ -129,6 +131,50 @@ class JobManager:
             self._save(st)
             self.cancel_flags[jid] = threading.Event()
             self.futures[jid] = self.pool.submit(self._run, jid, dest, options)
+        return dict(st)
+
+    def submit_area(self, item: ImageryItem, bbox: tuple[float, float, float, float], options: RunOptions) -> dict:
+        jid = uuid.uuid4().hex[:12]
+        d = self.dir(jid)
+        d.mkdir(parents=True, exist_ok=True)
+        now = time.time()
+        imagery = {
+            "source": item.source,
+            "id": item.id,
+            "title": item.title,
+            "url": item.url,
+            "license": item.license,
+            "attribution": item.attribution,
+            "date": item.date,
+            "provider": item.provider,
+            "bbox": list(bbox),
+        }
+        st = {
+            "id": jid,
+            "name": item.title,
+            "status": "queued",
+            "stage": "queued",
+            "progress": 0.0,
+            "message": "waiting to fetch imagery",
+            "created": now,
+            "updated": now,
+            "model": options.model or self.cfg.model,
+            "input": "input.tif",
+            "imagery": imagery,
+            "options": {
+                "model": options.model,
+                "calibration": options.calibration,
+                "dem_source": options.dem_source,
+                "prior_p95_m": options.prior_p95_m,
+                "semantic_prior": options.semantic_prior,
+                "gcps": len(options.gcps),
+            },
+        }
+        with self.lock:
+            self.jobs[jid] = st
+            self._save(st)
+            self.cancel_flags[jid] = threading.Event()
+            self.futures[jid] = self.pool.submit(self._run_area, jid, item, bbox, options)
         return dict(st)
 
     def cancel(self, jid: str) -> dict | None:
@@ -193,6 +239,37 @@ class JobManager:
             self._update(jid, status="cancelled", stage="cancelled", message="cancelled")
         except Exception as exc:  # noqa: BLE001
             log.exception("job %s failed", jid)
+            self._update(jid, status="failed", stage="failed", message=str(exc)[:300], error=str(exc)[:2000])
+
+    def _run_area(
+        self, jid: str, item: ImageryItem, bbox: tuple[float, float, float, float], options: RunOptions
+    ) -> None:
+        flag = self.cancel_flags[jid]
+        path = self.dir(jid) / "input.tif"
+        try:
+            self._update(jid, status="running", stage="fetch", progress=0.0, message="fetching selected imagery")
+            if flag.is_set():
+                raise JobCancelled("cancelled")
+            fetched = fetch_area(item, bbox, path)
+            self._update(jid, stage="load", progress=0.0, message="imagery fetched; starting pipeline")
+            metadata = {**item.to_dict(), **fetched, "bbox": list(bbox)}
+            meta = run(path, self.dir(jid), self.cfg, options, cancel=flag.is_set, source_metadata=metadata)
+            self._update(
+                jid,
+                status="done",
+                stage="done",
+                progress=1.0,
+                message="finished",
+                seconds=meta.get("seconds"),
+                units=meta.get("units"),
+                georeferenced=meta["input"]["georeferenced"],
+                model=meta["model"]["id"],
+                imagery={k: metadata.get(k) for k in ("source", "id", "title", "license", "attribution", "date", "provider", "bbox")},
+            )
+        except JobCancelled:
+            self._update(jid, status="cancelled", stage="cancelled", message="cancelled")
+        except Exception as exc:  # noqa: BLE001
+            log.exception("area job %s failed", jid)
             self._update(jid, status="failed", stage="failed", message=str(exc)[:300], error=str(exc)[:2000])
 
 

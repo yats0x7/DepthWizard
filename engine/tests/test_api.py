@@ -64,6 +64,66 @@ def test_geotiff_validate_and_recalibrate(client, geotiff_path):
     assert r.status_code == 200 and "raw" in r.json()
 
 
+def test_semantic_prior_option(client, geotiff_path):
+    with geotiff_path.open("rb") as fh:
+        r = client.post(
+            "/api/jobs",
+            files={"file": ("scene.tif", fh, "image/tiff")},
+            data={"semantic_prior": "true"},
+        )
+    st = _wait(client, r.json()["id"])
+    assert st["status"] == "done", st
+    assert st["meta"]["calibration"]["mode"] == "semantic"
+
+
+def test_imagery_search_and_area_job_are_network_independent(client, geotiff_path, monkeypatch):
+    from depthwizard.api import app as app_module
+    from depthwizard.api import jobs as jobs_module
+    from depthwizard.imagery.sources import ImageryItem
+
+    item = ImageryItem(
+        source="sentinel2",
+        id="test-scene",
+        title="Test scene",
+        url="https://sentinel-cogs.s3.us-west-2.amazonaws.com/test.tif",
+        bbox=[77.5, 12.9, 77.6, 13.0],
+        license="test licence",
+        attribution="test attribution",
+    )
+    monkeypatch.setattr(app_module, "search_imagery", lambda *args, **kwargs: [item])
+
+    r = client.post(
+        "/api/imagery/search",
+        json={"bbox": [77.5, 12.9, 77.6, 13.0], "sources": ["sentinel2"]},
+    )
+    assert r.status_code == 200 and r.json()[0]["id"] == "test-scene"
+
+    def fake_fetch(selected, bbox, out):
+        import shutil
+
+        shutil.copy2(geotiff_path, out)
+        return {"source": selected.source, "id": selected.id, "attribution": selected.attribution}
+
+    monkeypatch.setattr(jobs_module, "fetch_area", fake_fetch)
+    r = client.post(
+        "/api/jobs/from-area",
+        json={"bbox": [77.5, 12.9, 77.6, 13.0], "item": item.to_dict()},
+    )
+    assert r.status_code == 202
+    st = _wait(client, r.json()["id"])
+    assert st["status"] == "done", st
+    assert st["imagery"]["source"] == "sentinel2"
+    assert st["meta"]["imagery"]["attribution"] == "test attribution"
+
+    item_dict = item.to_dict()
+    item_dict["url"] = "https://example.com/not-approved.tif"
+    r = client.post(
+        "/api/jobs/from-area",
+        json={"bbox": [77.5, 12.9, 77.6, 13.0], "item": item_dict},
+    )
+    assert r.status_code == 422
+
+
 def test_rejects_bad_upload(client, tmp_path):
     p = tmp_path / "x.txt"
     p.write_text("hi")

@@ -7,7 +7,7 @@ export type Mode = 'presentation' | 'analysis'
 export type Nav = 'orbit' | 'fly' | 'walk'
 export type Layer = 'texture' | 'hypsometric' | 'slope' | 'aspect' | 'hillshade'
 export type Tool = 'probe' | 'profile' | 'gcp' | 'none'
-export type Panel = 'view' | 'analyse' | 'validate' | 'data'
+export type Panel = 'view' | 'analyse' | 'validate' | 'data' | 'map'
 
 export interface Probe {
   col: number

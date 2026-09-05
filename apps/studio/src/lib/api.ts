@@ -14,7 +14,30 @@ export interface Job {
   georeferenced?: boolean | null
   model?: string | null
   error?: string | null
+  imagery?: ImageryAttribution | null
   meta?: Meta | null
+}
+
+export interface ImageryAttribution {
+  source: string
+  id?: string
+  title?: string
+  license?: string
+  attribution?: string
+  date?: string | null
+  provider?: string | null
+  bbox?: number[]
+}
+
+export interface ImageryItem extends ImageryAttribution {
+  source: 'oam' | 'sentinel2'
+  id: string
+  title: string
+  url: string
+  bbox: number[]
+  gsd_m?: number | null
+  cloud?: number | null
+  thumbnail?: string | null
 }
 
 export interface Calibration {
@@ -128,6 +151,7 @@ export interface RunOptions {
   calibration?: string
   dem_source?: string
   prior_p95_m?: number
+  semantic_prior?: boolean
 }
 
 export interface Sample {
@@ -206,6 +230,18 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }).then(json<Meta>),
+  imagerySearch: (bbox: number[], sources: ('oam' | 'sentinel2')[] = ['oam', 'sentinel2']) =>
+    fetch(`${BASE}/api/imagery/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bbox, sources }),
+    }).then(json<ImageryItem[]>),
+  createFromArea: (bbox: number[], item: ImageryItem, opts: RunOptions) =>
+    fetch(`${BASE}/api/jobs/from-area`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bbox, item, ...opts }),
+    }).then(json<Job>),
   /** Live job status over server-sent events; falls back to polling when SSE is unavailable. */
   watch(id: string, onStatus: (job: Job) => void): () => void {
     let closed = false

@@ -19,6 +19,7 @@ from . import __version__
 from .analysis.terrain import surface_stats
 from .calibrate import dem as demmod
 from .calibrate.fit import GCP, Calibration, apply_gcps, calibrate, relative_height
+from .calibrate.priors import detect_flat_surfaces
 from .config import DEM_SOURCES, Settings
 from .config import settings as default_settings
 from .depth.backbone import get_backbone
@@ -55,10 +56,11 @@ class JobCancelled(RuntimeError):
 @dataclass
 class RunOptions:
     model: str | None = None  # preset (small | base | large) or HF id
-    calibration: str | None = None  # hybrid | affine | prior
+    calibration: str | None = None  # hybrid | affine | prior | semantic
     dem_source: str | None = None
     gcps: list[GCP] = field(default_factory=list)
     prior_p95_m: float | None = None
+    semantic_prior: bool = False
 
 
 def _noop(stage: str, frac: float, message: str = "") -> None:  # pragma: no cover
@@ -77,7 +79,7 @@ def _view_scale(shape: tuple[int, int], georeferenced: bool) -> float:
 def _write_outputs(
     out: Path, dsm: np.ndarray, src: RasterInput, cal: Calibration, meta: dict, cfg: Settings
 ) -> dict:
-    metric = cal.mode in ("hybrid", "affine", "prior", "gcp")
+    metric = cal.mode in ("hybrid", "affine", "prior", "semantic", "gcp")
     units = "m" if metric else "relative"
     files = dict(meta.get("files", {}))
     if src.georeferenced:
@@ -135,6 +137,7 @@ def run(
     options: RunOptions | None = None,
     progress: Progress = _noop,
     cancel: Cancel = _never,
+    source_metadata: dict | None = None,
 ) -> dict:
     options = options or RunOptions()
     out = Path(out_dir)
@@ -168,6 +171,8 @@ def run(
             "nodata_fraction": float(src.nodata_mask.mean()) if src.nodata_mask is not None else 0.0,
         },
     }
+    if source_metadata:
+        meta["imagery"] = source_metadata
     write_texture(out / "texture.jpg", src.rgb, cfg.texture_max_side)
     meta["files"] = {"texture": "texture.jpg"}
     check()
@@ -214,15 +219,17 @@ def run(
     t = time.time()
     prior = options.prior_p95_m or cfg.prior_p95_height_m
     if src.georeferenced:
+        calibration_mode = "semantic" if options.semantic_prior else (options.calibration or cfg.calibration)
         dsm, cal = calibrate(
             rel,
             dem,
             src.pixel_size_m,
-            mode=options.calibration or cfg.calibration,
+            mode=calibration_mode,
             prior_p95_m=prior,
             min_r2=cfg.min_fit_r2,
             min_relief_m=cfg.min_relief_m,
             dem_res_m=dem_meta.get("native_res_m", 30.0),
+            flat_mask=detect_flat_surfaces(src.rgb) if calibration_mode == "semantic" else None,
         )
         cal.dem = dem_meta
     else:
@@ -283,15 +290,17 @@ def recalibrate(
     prior = prior_p95_m or cfg.prior_p95_height_m
     dem_meta = meta.get("calibration", {}).get("dem", {})
     if src.georeferenced:
+        calibration_mode = mode or cfg.calibration
         dsm, cal = calibrate(
             rel,
             dem,
             src.pixel_size_m,
-            mode=mode or cfg.calibration,
+            mode=calibration_mode,
             prior_p95_m=prior,
             min_r2=cfg.min_fit_r2,
             min_relief_m=cfg.min_relief_m,
             dem_res_m=dem_meta.get("native_res_m", 30.0),
+            flat_mask=detect_flat_surfaces(src.rgb) if calibration_mode == "semantic" else None,
         )
         cal.dem = dem_meta
     else:

@@ -6,9 +6,9 @@ import { Progress } from '../ui'
 import { cn } from '../../lib/cn'
 import { fmtSeconds, timeAgo } from '../../lib/format'
 
-export const STAGES = ['load', 'infer', 'dem', 'calibrate', 'analyse', 'export', 'done']
+export const STAGES = ['fetch', 'load', 'infer', 'dem', 'calibrate', 'analyse', 'export', 'done']
 export const STAGE_LABEL: Record<string, string> = {
-  queued: 'Queued', load: 'Reading image', infer: 'Predicting depth', dem: 'Fetching terrain', calibrate: 'Calibrating heights',
+  queued: 'Queued', fetch: 'Fetching imagery', load: 'Reading image', infer: 'Predicting depth', dem: 'Fetching terrain', calibrate: 'Calibrating heights',
   analyse: 'Terrain statistics', export: 'Writing outputs', done: 'Finished', failed: 'Failed', cancelled: 'Cancelled',
 }
 
@@ -84,10 +84,13 @@ export function JobList() {
                   <span className="text-[11px] text-ink-3">{STAGE_LABEL[j.stage] ?? j.stage} · {j.message}</span>
                 </>
               ) : (
-                <span className="num text-[11px] text-ink-3">
-                  {j.status === 'failed' ? (j.error ?? 'failed').slice(0, 80) : `${j.units === 'm' ? 'metric DSM' : j.units === 'relative' ? 'relative DSM' : j.status} · ${fmtSeconds(j.seconds)} · ${timeAgo(j.created)}`}
-                </span>
+                  <span className="num text-[11px] text-ink-3">
+                    {j.status === 'failed' ? (j.error ?? 'failed').slice(0, 80) : `${j.units === 'm' ? 'metric DSM' : j.units === 'relative' ? 'relative DSM' : j.status}${j.imagery?.source ? ` · ${j.imagery.source}` : ''} · ${fmtSeconds(j.seconds)} · ${timeAgo(j.created)}`}
+                  </span>
               )}
+              {j.imagery?.attribution && <span className="truncate text-[10px] text-ink-3" title={`${j.imagery.license ?? ''} · ${j.imagery.attribution}`}>
+                {j.imagery.attribution}
+              </span>}
             </div>
           </li>
         )
@@ -98,7 +101,7 @@ export function JobList() {
 
 /** Overall progress from stage weights (inference dominates). */
 export function stageProgress(j: Job): number {
-  const weights: Record<string, [number, number]> = { queued: [0, 0.02], load: [0.02, 0.06], infer: [0.06, 0.72], dem: [0.72, 0.8], calibrate: [0.8, 0.86], analyse: [0.86, 0.88], export: [0.88, 0.99], done: [1, 1] }
+  const weights: Record<string, [number, number]> = { queued: [0, 0.02], fetch: [0.02, 0.08], load: [0.08, 0.1], infer: [0.1, 0.72], dem: [0.72, 0.8], calibrate: [0.8, 0.86], analyse: [0.86, 0.88], export: [0.88, 0.99], done: [1, 1] }
   const [a, b] = weights[j.stage] ?? [0, 0]
   return a + (b - a) * (j.progress ?? 0)
 }
