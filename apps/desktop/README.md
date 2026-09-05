@@ -11,4 +11,7 @@ Electron shell around the engine and the studio.
   engine into `engine/build/depthwizard` first (PyInstaller, see the root README); without it the
   packaged app falls back to `uv` on the PATH.
 
+The shell generates a per-launch token, passes it to the engine as `DW_DESKTOP_TOKEN`, and sends it
+with local-path submissions; in `pnpm dev` set the same `DW_DESKTOP_TOKEN` when starting the engine.
+
 Engine output is written to `engine.log` in the app's user-data folder (File > Engine log).

@@ -12,7 +12,7 @@
 - [x] viewer: terrain material layers, proxy picking, camera rig, atmosphere, effects
 - [x] verify Presentation lighting/sky on a real GPU (Electron screenshot, own sky dome shader)
 - [x] verify walk, probe, profile, flood, GCP recalibrate, validation, PNG path end to end
-- [ ] design pass at desktop + narrow widths (Impeccable craft floor)
+- [x] design pass at desktop + narrow widths (Impeccable craft floor)
 
 ## Desktop / packaging
 - [x] Electron main + preload, screenshot mode, builder config
@@ -22,4 +22,8 @@
 ## Docs / process
 - [x] docs/PITCH_DECK.md
 - [x] commit milestone, push to yats0x7/DepthWizard main
-- [ ] 3 independent reviews, fix findings, final commit + push
+- [x] 3 independent reviews (correctness, design, security) and fixes: aspect convention, hillshade
+      azimuth, RGB+NIR alpha, sea-level clamp, job delete/switch races, SSE end, traversal, CORS,
+      desktop token for local paths, Electron sandbox/navigation guard, class-mask validation,
+      legend, prior datum labelling, picking refinement, offline model message + prefetch
+- [ ] final commit + push

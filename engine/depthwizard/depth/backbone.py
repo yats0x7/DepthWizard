@@ -54,8 +54,15 @@ class DepthAnythingBackbone:
         self.model_key = model or cfg.model
         self.name = resolve_model_id(self.model_key)
         kw = {"token": cfg.hf_token} if cfg.hf_token else {}
-        self.processor = AutoImageProcessor.from_pretrained(self.name, **kw)
-        self.model = AutoModelForDepthEstimation.from_pretrained(self.name, **kw)
+        try:
+            self.processor = AutoImageProcessor.from_pretrained(self.name, **kw)
+            self.model = AutoModelForDepthEstimation.from_pretrained(self.name, **kw)
+        except Exception as exc:  # offline first run, gated repo, bad id
+            raise RuntimeError(
+                f"Depth model '{self.name}' is not on this machine and could not be downloaded "
+                f"({type(exc).__name__}). Run `depthwizard prefetch` while online, or set DW_HF_TOKEN "
+                "for gated models."
+            ) from exc
         if cfg.finetuned and Path(cfg.finetuned).exists():
             state = torch.load(cfg.finetuned, map_location="cpu")
             state = state.get("state_dict", state)
@@ -117,16 +124,17 @@ def get_backbone(cfg: Settings = default_settings, model: str | None = None) -> 
     """Cached backbone per model preset. An injected backbone (tests) wins for every model."""
     if _injected is not None:
         return _injected
-    key = model or cfg.model
+    name = model or cfg.model
+    key = f"{name}|{cfg.device}|{cfg.infer_res}|{cfg.tile}|{cfg.overlap}|{cfg.tta}|{cfg.finetuned}"
     with _lock:
         if key not in _backbones:
-            log.info("loading depth model %s", resolve_model_id(key))
-            _backbones[key] = DepthAnythingBackbone(cfg, model=key)
+            log.info("loading depth model %s", resolve_model_id(name))
+            _backbones[key] = DepthAnythingBackbone(cfg, model=name)
         return _backbones[key]
 
 
 def loaded_models() -> list[str]:
-    return list(_backbones)
+    return [b.name for b in _backbones.values()]
 
 
 def set_backbone(backbone: DepthBackbone | None) -> None:

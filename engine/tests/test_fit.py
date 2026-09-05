@@ -63,3 +63,12 @@ def test_gcps_refit():
     assert cal.mode == "gcp" and cal.gcp_count == 3
     assert np.allclose(out, truth, atol=0.5)
     assert cal.gcp_rmse is not None and cal.gcp_rmse < 0.5
+
+
+def test_clamp_sea_level_keeps_land():
+    from depthwizard.calibrate.dem import clamp_sea_level
+
+    a = np.array([[-3000.0, -1.0, 0.0], [5.0, np.nan, 120.0]], np.float32)
+    out = clamp_sea_level(a)
+    assert out[0, 0] == 0 and out[0, 1] == 0 and out[1, 0] == 5 and out[1, 2] == 120
+    assert np.isnan(out[1, 1])

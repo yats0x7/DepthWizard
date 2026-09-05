@@ -70,7 +70,7 @@ export function JobList() {
                   onClick={(e) => {
                     e.stopPropagation()
                     if (running) api.cancel(j.id)
-                    else removeJob(j.id)
+                    else if (window.confirm(`Delete "${j.name}" and all of its output files? This cannot be undone.`)) removeJob(j.id)
                   }}
                   title={running ? 'Cancel' : 'Delete'}
                   className="rounded p-0.5 text-ink-3 opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"

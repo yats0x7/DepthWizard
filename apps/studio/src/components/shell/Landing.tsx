@@ -22,7 +22,9 @@ export function Landing() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
         <h2 className="font-display text-[22px] font-semibold tracking-tight">{job.status === 'failed' ? 'This run failed' : 'Run cancelled'}</h2>
-        <p className="max-w-md text-[13px] text-ink-2">{job.error ?? job.message}</p>
+        <p className="max-w-md text-[13px] leading-relaxed text-ink-2">
+          {job.status === 'failed' ? `The engine reported: ${job.error ?? job.message}. Check that the file is a readable PNG, JPG or GeoTIFF and try again; the engine log has the full trace.` : 'The run was stopped before it finished.'}
+        </p>
         <Button onClick={() => openJob(null)}>Back</Button>
       </div>
     )
@@ -47,7 +49,7 @@ export function Landing() {
         </div>
         <Dropzone />
         <Samples />
-        <ol className="grid grid-cols-3 gap-6 border-t border-line pt-6">
+        <ol className="grid grid-cols-1 gap-6 border-t border-line pt-6 md:grid-cols-3">
           {[
             { icon: Scan, title: 'Depth from one view', body: 'Depth Anything V2 reads structure from the image; tiles are aligned to one global pass.' },
             { icon: Ruler, title: 'Metres from terrain', body: 'GeoTIFF footprints pull a coarse DEM; the terrain trend sets the scale, ground control points refine it.' },

@@ -13,7 +13,7 @@ function Histogram({ bins, counts, unit }: { bins: number[]; counts: number[]; u
           <div key={i} className="flex-1 rounded-t-[1px] bg-accent/70" style={{ height: `${(c / max) * 100}%` }} title={`${fmt(bins[i], 1)} to ${fmt(bins[i + 1], 1)} ${unit}: ${fmtInt(c)} px`} />
         ))}
       </div>
-      <div className="num flex justify-between text-[10px] text-ink-3">
+      <div className="num flex justify-between text-[11px] text-ink-3">
         <span>{fmt(bins[0], unit ? 0 : 2)} {unit}</span>
         <span>{fmt(bins[bins.length - 1], unit ? 0 : 2)} {unit}</span>
       </div>

@@ -59,6 +59,12 @@ uv run --directory engine depthwizard recalibrate data/out/urban --gcps gcps.jso
 
 Drop sample scenes into `data/samples/` and they appear in the studio under "Sample scenes".
 
+The depth model downloads from Hugging Face on first use. For an offline machine, fetch it first:
+
+```bash
+uv run --directory engine depthwizard prefetch small
+```
+
 ## How it works
 
 1. **Read** PNG/JPG (Pillow) or GeoTIFF (rasterio). Large inputs are downscaled to 6000 px; the
@@ -90,12 +96,17 @@ fine-tuned on aerial DSM data), `DW_HF_TOKEN`.
 
 ## API
 
-`GET /api/system`, `GET /api/samples`, `POST /api/jobs` (multipart: file, model, calibration,
-dem_source, prior_p95_m, gcps), `POST /api/jobs/from-sample`, `GET /api/jobs`, `GET /api/jobs/{id}`,
-`GET /api/jobs/{id}/events` (server-sent progress), `POST /api/jobs/{id}/cancel`,
-`DELETE /api/jobs/{id}`, `GET /api/jobs/{id}/files/{name}`, `POST /api/jobs/{id}/validate`
-(multipart reference raster), `POST /api/jobs/{id}/recalibrate` (JSON: mode, gcps, prior_p95_m).
-Interactive docs at `/docs`.
+`GET /api/health`, `GET /api/system`, `POST /api/warmup?model=`, `GET /api/samples`,
+`POST /api/jobs` (multipart: file, model, calibration, dem_source, prior_p95_m, gcps),
+`POST /api/jobs/from-sample`, `GET /api/jobs`, `GET /api/jobs/{id}`, `GET /api/jobs/{id}/events`
+(server-sent progress), `POST /api/jobs/{id}/cancel`, `DELETE /api/jobs/{id}`,
+`GET /api/jobs/{id}/files/{name}`, `POST /api/jobs/{id}/validate` (multipart: reference raster,
+optional `classes` raster of integer landscape codes and `class_names` JSON for per-class metrics),
+`POST /api/jobs/{id}/recalibrate` (JSON: mode, gcps, prior_p95_m). Interactive docs at `/docs`.
+
+`POST /api/jobs/from-path` runs a local file without an upload. It only exists when the engine was
+started with `DW_DESKTOP_TOKEN` and the request carries the same value in `X-DW-Token`; the desktop
+shell generates that token per launch. CORS is limited to the studio origins in `DW_CORS_ORIGINS`.
 
 ## Tests
 
@@ -109,8 +120,12 @@ pnpm lint            # tsc + ruff
 
 Run a scene, then validate against a reference raster (LiDAR DSM, photogrammetric DSM, or the
 reference set from the problem statement). `metrics.json` reports raw and scale/offset-aligned
-metrics; `error_map.png` shows signed error. Per-landscape metrics come from passing class masks to
-`depthwizard.eval.metrics.compare`.
+metrics; `error_map.png` shows signed error. For the per-landscape breakdown the problem statement
+asks for (urban, sparse, hilly, forested), add a class raster of integer codes in the Validate panel
+or the API and name the codes (`1=urban, 2=forest`).
+
+Height conventions: aspect is the downslope bearing clockwise from north; the hillshade preview is
+lit from the north-west; terrain tiles are clamped at sea level so oceans calibrate as a 0 m surface.
 
 ## Packaging notes
 

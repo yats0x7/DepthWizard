@@ -3,7 +3,7 @@ import { FileCheck2 } from 'lucide-react'
 import { useStore } from '../../store'
 import { api, type MetricBlock } from '../../lib/api'
 import { fmt, fmtInt } from '../../lib/format'
-import { Button, Section, Stat } from '../ui'
+import { Button, Input, Section, Stat } from '../ui'
 
 function Block({ title, m, unit, note }: { title: string; m: MetricBlock; unit: string; note?: string }) {
   return (
@@ -28,6 +28,9 @@ function Block({ title, m, unit, note }: { title: string; m: MetricBlock; unit: 
 export function ValidatePanel() {
   const s = useStore()
   const input = useRef<HTMLInputElement>(null)
+  const maskInput = useRef<HTMLInputElement>(null)
+  const [mask, setMask] = useState<File | null>(null)
+  const [names, setNames] = useState('1=urban, 2=sparse, 3=hilly, 4=forest')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   if (!s.jobId || !s.meta) return null
@@ -37,7 +40,12 @@ export function ValidatePanel() {
     setBusy(true)
     setErr(null)
     try {
-      const r = await api.validate(s.jobId!, file)
+      const classNames: Record<string, string> = {}
+      for (const part of names.split(',')) {
+        const [k, v] = part.split('=').map((x) => x.trim())
+        if (k && v) classNames[k] = v
+      }
+      const r = await api.validate(s.jobId!, file, mask, classNames)
       s.set('metrics', r)
       s.set('version', s.version + 1)
     } catch (e) {
@@ -51,6 +59,20 @@ export function ValidatePanel() {
       <Section title="Reference data">
         <p className="text-[12px] leading-relaxed text-ink-3">Drop a reference DSM, DTM or LiDAR raster. A georeferenced GeoTIFF is reprojected onto the job grid; an ungeoreferenced raster is resized to it.</p>
         <input ref={input} type="file" accept=".tif,.tiff,.geotiff,.img,.png" className="hidden" onChange={(e) => e.target.files?.[0] && run(e.target.files[0])} />
+        <input ref={maskInput} type="file" accept=".tif,.tiff,.geotiff,.img,.png" className="hidden" onChange={(e) => setMask(e.target.files?.[0] ?? null)} />
+        <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-panel-2/60 p-2.5">
+          <span className="label">Landscape classes (optional)</span>
+          <p className="text-[11px] text-ink-3">A raster of integer codes on any grid gives per-landscape metrics (urban, sparse, hilly, forested).</p>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => maskInput.current?.click()}>{mask ? mask.name : 'Choose class raster'}</Button>
+            {mask && (
+              <Button size="sm" variant="ghost" onClick={() => setMask(null)}>
+                Remove
+              </Button>
+            )}
+          </div>
+          <Input value={names} onChange={(e) => setNames(e.target.value)} placeholder="1=urban, 2=forest" disabled={!mask} />
+        </div>
         <Button variant="primary" disabled={busy} onClick={() => input.current?.click()}>
           <FileCheck2 size={15} /> {busy ? 'Comparing' : 'Choose reference raster'}
         </Button>

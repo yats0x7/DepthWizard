@@ -54,9 +54,9 @@ export function ViewPanel() {
           options={[
             { value: 'texture', label: 'Image' },
             { value: 'hypsometric', label: 'Height' },
-            { value: 'slope', label: 'Slope' },
-            { value: 'aspect', label: 'Aspect' },
-            { value: 'hillshade', label: 'Shade' },
+            { value: 'slope', label: 'Slope', disabled: !s.meta?.input.georeferenced, title: s.meta?.input.georeferenced ? 'Slope in degrees' : 'Needs georeferencing' },
+            { value: 'aspect', label: 'Aspect', disabled: !s.meta?.input.georeferenced, title: s.meta?.input.georeferenced ? 'Downslope direction' : 'Needs georeferencing' },
+            { value: 'hillshade', label: 'Relief' },
           ]}
         />
         <Field label="Contours" hint={metric ? 'metres' : 'relative units'}>

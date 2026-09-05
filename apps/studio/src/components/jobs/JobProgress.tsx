@@ -34,7 +34,7 @@ export function JobProgress({ job }: { job: Job }) {
               <span className={cn('flex h-6 w-6 items-center justify-center rounded-full border text-[11px] transition-colors', done ? 'border-accent bg-accent text-ground' : current ? 'border-accent text-accent' : 'border-line-2 text-ink-3')}>
                 {done ? <Check size={13} /> : current ? <Loader2 size={12} className="animate-spin" /> : i + 1}
               </span>
-              <span className={cn('text-[10px]', done || current ? 'text-ink-2' : 'text-ink-3')}>{STAGE_LABEL[s].split(' ')[0]}</span>
+              <span className={cn('text-[11px]', done || current ? 'text-ink-2' : 'text-ink-3')}>{STAGE_LABEL[s].split(' ')[0]}</span>
             </li>
           )
         })}

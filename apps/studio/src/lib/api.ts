@@ -136,7 +136,7 @@ export interface Sample {
   georeferenced: boolean
 }
 
-const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? (window as any).__DW_API__ ?? ''
+const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? window.__DW_API__ ?? ''
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -193,9 +193,11 @@ export const api = {
     }),
   cancel: (id: string) => fetch(`${BASE}/api/jobs/${id}/cancel`, { method: 'POST' }).then(json<Job>),
   delete: (id: string) => fetch(`${BASE}/api/jobs/${id}`, { method: 'DELETE' }).then(json<{ deleted: string }>),
-  validate: (id: string, file: File) => {
+  validate: (id: string, file: File, classes?: File | null, classNames?: Record<string, string>) => {
     const fd = new FormData()
     fd.append('file', file)
+    if (classes) fd.append('classes', classes)
+    if (classNames && Object.keys(classNames).length) fd.append('class_names', JSON.stringify(classNames))
     return fetch(`${BASE}/api/jobs/${id}/validate`, { method: 'POST', body: fd }).then(json<Metrics>)
   },
   recalibrate: (id: string, body: { mode?: string | null; gcps?: GCP[]; prior_p95_m?: number | null }) =>
@@ -253,4 +255,4 @@ export interface DesktopBridge {
   revealJob: (id: string) => Promise<void>
 }
 
-export const desktop: DesktopBridge | undefined = (window as any).depthwizard
+export const desktop: DesktopBridge | undefined = window.depthwizard

@@ -65,8 +65,14 @@ export function AnalysePanel() {
               Source: {meta.units === 'm' ? `metric DSM, ${meta.calibration.mode} calibration${meta.calibration.dem?.source ? ` against ${meta.calibration.dem.source}` : ''}${meta.calibration.gcp_count ? `, ${meta.calibration.gcp_count} GCP` : ''}` : 'relative DSM in [0, 1]; no absolute scale. Add GCPs for metres.'}
             </p>
             <Stat label="Above scene minimum" value={fmt(p.h - hf.hMin, hf.units === 'm' ? 2 : 3)} unit={unit} />
-            <Stat label="Slope" value={fmt(p.slope, 1)} unit="°" />
-            <Stat label="Aspect" value={`${fmt(p.aspect, 0)}° ${compass(p.aspect)}`} />
+            {meta.input.georeferenced ? (
+              <>
+                <Stat label="Slope" value={fmt(p.slope, 1)} unit="°" />
+                <Stat label="Aspect (downslope)" value={`${fmt(p.aspect, 0)}° ${compass(p.aspect)}`} />
+              </>
+            ) : (
+              <p className="py-1 text-[11px] text-ink-3">Slope needs a ground sample distance; this image has no georeferencing.</p>
+            )}
             <Stat label="Pixel" value={`${Math.round(p.col)}, ${Math.round(p.row)}`} />
             {map && <Stat label={`Map${hf.epsg ? ` EPSG:${hf.epsg}` : ''}`} value={`${fmt(map[0], 1)}, ${fmt(map[1], 1)}`} />}
             <Button size="sm" className="mt-2 self-start" onClick={() => s.addPin(p)}>
@@ -114,7 +120,7 @@ export function AnalysePanel() {
       <Section title="Flood level" right={<Waves size={14} className="text-accent" />}>
         <Switch label="Show water plane" checked={s.flood.on} onChange={(v) => s.set('flood', { ...s.flood, on: v })} />
         <Slider value={s.flood.level} min={hf.hMin} max={hf.hMax} step={relief / 400} disabled={!s.flood.on} onChange={(v) => s.set('flood', { ...s.flood, level: v })} format={(v) => `${fmt(v, hf.units === 'm' ? 1 : 3)}${unit}`} />
-        <p className="num text-[11px] text-ink-3">{fmt(floodFraction(hf, s.flood.level) * 100, 1)}% of valid pixels below this level</p>
+        <p className="num text-[11px] text-ink-3">{fmt(floodFraction(hf, s.flood.level) * 100, 1)}% of valid pixels below this level (sampled)</p>
       </Section>
 
       <Section title="Ground control points">

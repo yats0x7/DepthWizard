@@ -33,23 +33,26 @@ function Readout() {
   const p = hover ?? probe
   if (!hf || !meta) return null
   const unit = hf.units === 'm' ? 'm' : ''
+  const prior = meta.calibration.mode === 'prior'
   const source =
     meta.units === 'm'
-      ? `metric DSM · ${meta.calibration.mode}${meta.calibration.dem?.source ? ` · ${meta.calibration.dem.source}` : ''}`
+      ? prior
+        ? 'metres from scene prior · datum arbitrary'
+        : `metric DSM · ${meta.calibration.mode}${meta.calibration.dem?.source ? ` · ${meta.calibration.dem.source}` : ''}`
       : 'relative DSM (rDSM), unitless 0 to 1'
   return (
     <div className="hud-chip flex min-w-56 flex-col gap-1 px-3 py-2">
       <div className="flex items-baseline justify-between gap-4">
         <span className="label">{hover ? 'Under cursor' : probe ? 'Probe' : 'Height'}</span>
-        <span className="text-[10px] text-ink-3">{p ? `px ${Math.round(p.col)}, ${Math.round(p.row)}` : ''}</span>
+        <span className="text-[11px] text-ink-3">{p ? `px ${Math.round(p.col)}, ${Math.round(p.row)}` : ''}</span>
       </div>
-      <div className="num text-[22px] leading-none text-ink">
+      <div className={cn('num text-[22px] leading-none', prior ? 'text-warm' : 'text-ink')}>
         {p ? fmt(p.h, hf.units === 'm' ? 2 : 3) : '—'}
         <span className="ml-1 text-[12px] text-ink-3">{unit}</span>
       </div>
       <div className="flex items-center justify-between text-[11px] text-ink-3">
         <span>{source}</span>
-        {p && Number.isFinite(p.slope) && <span className="num">{fmt(p.slope, 1)}° {compass(p.aspect)}</span>}
+        {p && meta.input.georeferenced && Number.isFinite(p.slope) && <span className="num">{fmt(p.slope, 1)}° {compass(p.aspect)}</span>}
       </div>
     </div>
   )
@@ -176,6 +179,35 @@ function CoordChip() {
   )
 }
 
+const TURBO = 'linear-gradient(90deg,#30123b,#4662d7,#36aaf9,#1ae4b6,#72fe5e,#c8ef34,#faba39,#f66b19,#ca2a04,#7a0403)'
+const VIRIDIS = 'linear-gradient(90deg,#440154,#414487,#2a788e,#22a884,#7ad151,#fde725)'
+const ASPECT = 'linear-gradient(90deg,#f2400f,#f2f20f,#0ff20f,#0ff2f2,#0f0ff2,#f20ff2,#f2400f)'
+
+function Legend() {
+  const layer = useStore((s) => s.layer)
+  const hf = useStore((s) => s.heightField)
+  if (!hf || layer === 'texture') return null
+  const unit = hf.units === 'm' ? ' m' : ''
+  const spec =
+    layer === 'hypsometric'
+      ? { bg: TURBO, lo: `${fmt(hf.hMin, hf.units === 'm' ? 1 : 2)}${unit}`, hi: `${fmt(hf.hMax, hf.units === 'm' ? 1 : 2)}${unit}`, title: 'Height' }
+      : layer === 'slope'
+        ? { bg: VIRIDIS, lo: '0°', hi: '60°', title: 'Slope' }
+        : layer === 'aspect'
+          ? { bg: ASPECT, lo: 'N  E  S  W  N', hi: '', title: 'Aspect (downslope)' }
+          : { bg: 'linear-gradient(90deg,#1f1f1f,#ffffff)', lo: 'shadow', hi: 'lit', title: 'Relief from NW sun' }
+  return (
+    <div className="hud-chip flex w-44 flex-col gap-1 px-2.5 py-2">
+      <span className="label">{spec.title}</span>
+      <div className="h-2 rounded-full" style={{ background: spec.bg }} />
+      <div className="num flex justify-between text-[10px] text-ink-2">
+        <span className={layer === 'aspect' ? 'w-full text-center tracking-[0.35em]' : ''}>{spec.lo}</span>
+        <span>{spec.hi}</span>
+      </div>
+    </div>
+  )
+}
+
 export function HUD() {
   const mode = useStore((s) => s.mode)
   const nav = useStore((s) => s.nav)
@@ -193,7 +225,7 @@ export function HUD() {
           <ModeSwitch />
         </div>
         {locked && (
-          <div className="hud-chip flex items-center gap-2 px-3 py-1.5 text-[12px] text-ink-2">
+          <div className="hud-chip flex items-center gap-2 whitespace-nowrap px-3 py-1.5 text-[12px] text-ink-2">
             <span>Click to capture mouse</span>
             <Kbd>W</Kbd>
             <Kbd>A</Kbd>
@@ -231,6 +263,7 @@ export function HUD() {
           <span className="capitalize">{nav}</span>
           {nav === 'orbit' && <span className="text-ink-3">· {tool}</span>}
         </div>
+        <Legend />
       </div>
 
       {locked && (

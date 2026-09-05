@@ -135,7 +135,8 @@ export function sampleSlope(hf: HeightField, col: number, row: number): { slope:
   const gy = (d[r1 * w + c] - d[r0 * w + c]) / ((r1 - r0) * hf.dy)
   if (!Number.isFinite(gx) || !Number.isFinite(gy)) return { slope: NaN, aspect: NaN }
   const slope = (Math.atan(Math.hypot(gx, gy)) * 180) / Math.PI
-  const aspect = ((Math.atan2(gx, -gy) * 180) / Math.PI + 360) % 360
+  // downslope bearing clockwise from north: gy is dh/d(south), so the north component is +gy
+  const aspect = ((Math.atan2(-gx, gy) * 180) / Math.PI + 360) % 360
   return { slope, aspect }
 }
 
@@ -165,8 +166,8 @@ export function profileAlong(hf: HeightField, a: [number, number], b: [number, n
  */
 export function buildTerrainGeometry(hf: HeightField, maxSide = 1536): { geometry: THREE.BufferGeometry; stride: number } {
   const stride = Math.max(1, Math.ceil(Math.max(hf.width, hf.height) / maxSide))
-  const cols = Math.floor((hf.width - 1) / stride) + 1
-  const rows = Math.floor((hf.height - 1) / stride) + 1
+  const cols = Math.ceil((hf.width - 1) / stride) + 1
+  const rows = Math.ceil((hf.height - 1) / stride) + 1
   const positions = new Float32Array(cols * rows * 3)
   const uvs = new Float32Array(cols * rows * 2)
   const valid = new Uint8Array(cols * rows)

@@ -17,15 +17,26 @@ log = logging.getLogger(__name__)
 CACHE_NODATA = -32768.0
 
 
-def cache_dir() -> Path:
-    from ..config import settings
+def cache_dir(root: Path | None = None) -> Path:
+    if root is None:
+        from ..config import settings
 
-    d = Path(settings.data_dir) / "dem_cache"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+        root = settings.dem_cache_dir()
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
-def fetch_dem(bounds4326: tuple[float, float, float, float], source: str = "terrarium"):
+def clamp_sea_level(arr: np.ndarray, floor: float = 0.0) -> np.ndarray:
+    """Raise bathymetric (negative) cells to sea level so oceans calibrate as a 0 m surface."""
+    out = arr.copy()
+    neg = np.isfinite(out) & (out < floor)
+    out[neg] = floor
+    return out
+
+
+def fetch_dem(
+    bounds4326: tuple[float, float, float, float], source: str = "terrarium", cache_root: Path | None = None
+):
     """Return (array, profile) of the DEM covering bounds (W, S, E, N in EPSG:4326).
 
     Results are cached per (source, bounds rounded to ~10 m) because fetching is the slowest step.
@@ -34,7 +45,7 @@ def fetch_dem(bounds4326: tuple[float, float, float, float], source: str = "terr
     pad = 0.002  # ~200 m so bilinear resampling has support at the edges
     box = [round(w - pad, 4), round(s - pad, 4), round(e + pad, 4), round(n + pad, 4)]
     key = hashlib.sha1(json.dumps([source, box]).encode()).hexdigest()[:16]
-    cache = cache_dir() / f"{source}_{key}.tif"
+    cache = cache_dir(cache_root) / f"{source}_{key}.tif"
     if cache.exists():
         with rasterio.open(cache) as ds:
             arr = ds.read(1).astype(np.float32)
@@ -45,6 +56,8 @@ def fetch_dem(bounds4326: tuple[float, float, float, float], source: str = "terr
         from .terrarium import fetch_terrarium
 
         arr, profile = fetch_terrarium(box)
+        # Terrain Tiles merge ETOPO bathymetry: the sea floor is not a surface height, the sea is.
+        arr = clamp_sea_level(arr)
     else:
         from dem_stitcher import stitch_dem
 
@@ -75,7 +88,12 @@ def fetch_dem(bounds4326: tuple[float, float, float, float], source: str = "terr
 
 
 def resample_to_grid(
-    arr: np.ndarray, profile: dict, dst_crs: CRS, dst_transform: Affine, dst_shape: tuple[int, int]
+    arr: np.ndarray,
+    profile: dict,
+    dst_crs: CRS,
+    dst_transform: Affine,
+    dst_shape: tuple[int, int],
+    nearest: bool = False,
 ) -> np.ndarray:
     out = np.full(dst_shape, np.nan, np.float32)
     src = np.where(np.isfinite(arr), arr, CACHE_NODATA).astype(np.float32)
@@ -88,16 +106,21 @@ def resample_to_grid(
         dst_transform=dst_transform,
         dst_crs=dst_crs,
         dst_nodata=np.nan,
-        resampling=Resampling.bilinear,
+        resampling=Resampling.nearest if nearest else Resampling.bilinear,
     )
     return out
 
 
 def fetch_dem_on_grid(
-    bounds4326, dst_crs: CRS, dst_transform: Affine, dst_shape: tuple[int, int], source: str = "terrarium"
+    bounds4326,
+    dst_crs: CRS,
+    dst_transform: Affine,
+    dst_shape: tuple[int, int],
+    source: str = "terrarium",
+    cache_root: Path | None = None,
 ) -> tuple[np.ndarray, dict]:
     """DEM resampled onto the working grid plus metadata about the source."""
-    arr, profile = fetch_dem(bounds4326, source)
+    arr, profile = fetch_dem(bounds4326, source, cache_root)
     res = abs(profile["transform"].a)
     if profile["crs"] and profile["crs"].is_geographic:
         res *= 111_320
@@ -112,7 +135,7 @@ def fetch_dem_on_grid(
 
 
 def read_raster_on_grid(
-    path, dst_crs: CRS | None, dst_transform: Affine | None, dst_shape: tuple[int, int]
+    path, dst_crs: CRS | None, dst_transform: Affine | None, dst_shape: tuple[int, int], nearest: bool = False
 ) -> np.ndarray:
     """Read any raster (reference DSM / LiDAR) onto the working grid; plain resize when ungeoreferenced."""
     with rasterio.open(path) as ds:
@@ -122,6 +145,7 @@ def read_raster_on_grid(
         if dst_crs is None or dst_transform is None or ds.crs is None or ds.transform.is_identity:
             import cv2
 
-            return cv2.resize(arr, (dst_shape[1], dst_shape[0]), interpolation=cv2.INTER_LINEAR)
+            interp = cv2.INTER_NEAREST if nearest else cv2.INTER_LINEAR
+            return cv2.resize(arr, (dst_shape[1], dst_shape[0]), interpolation=interp)
         profile = {"transform": ds.transform, "crs": ds.crs}
-    return resample_to_grid(arr, profile, dst_crs, dst_transform, dst_shape)
+    return resample_to_grid(arr, profile, dst_crs, dst_transform, dst_shape, nearest=nearest)

@@ -46,6 +46,7 @@ interface State {
   nav: Nav
   panel: Panel
   exaggeration: number
+  savedExaggeration: number | null
   layer: Layer
   wireframe: boolean
   contourStep: number
@@ -104,6 +105,7 @@ export const useStore = create<State>()(
     nav: 'orbit',
     panel: 'view',
     exaggeration: 1,
+    savedExaggeration: null,
     layer: 'texture',
     wireframe: false,
     contourStep: 0,
@@ -158,6 +160,7 @@ export const useStore = create<State>()(
       if (!id) return
       try {
         const job = await api.job(id)
+        if (get().jobId !== id) return
         set({ job })
         if (job.status !== 'done' || !job.meta) {
           set({ meta: job.meta ?? null, heightField: null, loading: null })
@@ -166,6 +169,7 @@ export const useStore = create<State>()(
         set({ loading: 'Loading surface model' })
         const name = job.meta.files.dsm ?? job.meta.files.rdsm
         const hf = await loadHeightField(api.fileUrl(id, name) + `?v=${Date.now()}`, job.meta)
+        if (get().jobId !== id) return // another job was opened while this one downloaded
         const level = hf.hMin + (hf.hMax - hf.hMin) * 0.2
         set((s) => ({
           meta: job.meta!,
@@ -185,7 +189,11 @@ export const useStore = create<State>()(
       if (get().jobId === id) await get().openJob(null)
       await get().refreshJobs()
     },
-    setMode: (mode) => set({ mode, exaggeration: mode === 'analysis' ? 1 : get().exaggeration }),
+    setMode: (mode) => {
+      const s = get()
+      if (mode === 'analysis') set({ mode, savedExaggeration: s.exaggeration, exaggeration: 1 })
+      else set({ mode, exaggeration: s.savedExaggeration ?? s.exaggeration })
+    },
     set: (k, v) => set({ [k]: v } as Pick<State, typeof k>),
     setHover: (hover) => set({ hover }),
     setProbe: (probe) => set({ probe }),
@@ -230,5 +238,5 @@ export function publishTelemetry() {
 }
 
 if (import.meta.env.DEV) {
-  ;(window as any).__dw = { store: useStore, telemetry }
+  window.__dw = { store: useStore, telemetry }
 }

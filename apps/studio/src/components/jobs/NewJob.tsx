@@ -154,6 +154,7 @@ export function Dropzone({ compact = false, className }: { compact?: boolean; cl
 export function Samples({ className }: { className?: string }) {
   const [samples, setSamples] = useState<{ name: string; size: number; georeferenced: boolean }[]>([])
   const [running, setRunning] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
   const [opts] = useRunOptions()
   const online = useStore((s) => s.online)
   const refreshJobs = useStore((s) => s.refreshJobs)
@@ -174,24 +175,28 @@ export function Samples({ className }: { className?: string }) {
           className="justify-between px-2"
           onClick={async () => {
             setRunning(s.name)
+            setErr(null)
             try {
               const job = await api.createFromSample(s.name, opts)
               await refreshJobs()
               await openJob(job.id)
+            } catch (e) {
+              setErr(`Could not start ${s.name}: ${(e as Error).message}`)
             } finally {
               setRunning(null)
             }
           }}
         >
-          <span className="flex items-center gap-2 truncate">
+          <span className="flex min-w-0 items-center gap-2">
             <ImagePlus size={14} className="shrink-0 text-accent" />
             <span className="truncate">{s.name}</span>
           </span>
-          <span className="num text-[11px] text-ink-3">
+          <span className="num shrink-0 whitespace-nowrap text-[11px] text-ink-3">
             {s.georeferenced ? 'GeoTIFF' : 'image'} · {fmtBytes(s.size)}
           </span>
         </Button>
       ))}
+      {err && <p className="px-1 text-[12px] text-danger">{err}</p>}
     </div>
   )
 }

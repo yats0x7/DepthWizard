@@ -9,8 +9,11 @@ import { createServer } from 'node:net'
 import { existsSync, mkdirSync, writeFileSync, createWriteStream } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
 import http from 'node:http'
+import { randomBytes } from 'node:crypto'
 
 const DEV_URL = process.env.DW_DEV_URL
+// Per-launch secret shared with the engine; only requests carrying it may submit local file paths.
+const DESKTOP_TOKEN = process.env.DW_DESKTOP_TOKEN ?? randomBytes(16).toString('hex')
 const REPO_ROOT = join(__dirname, '..', '..', '..')
 let engine: ChildProcess | null = null
 let enginePort = 8000
@@ -29,7 +32,7 @@ function freePort(): Promise<number> {
 }
 
 function engineCommand(): { cmd: string; args: string[]; cwd: string; env: NodeJS.ProcessEnv } {
-  const env = { ...process.env, DW_STATIC_DIR: join(REPO_ROOT, 'apps', 'studio', 'dist'), PYTHONUNBUFFERED: '1' }
+  const env = { ...process.env, DW_STATIC_DIR: join(REPO_ROOT, 'apps', 'studio', 'dist'), DW_DESKTOP_TOKEN: DESKTOP_TOKEN, PYTHONUNBUFFERED: '1' }
   if (app.isPackaged) {
     // packaged: a self-contained engine folder next to the app resources (see electron-builder.yml)
     const bin = join(process.resourcesPath, 'engine', process.platform === 'win32' ? 'depthwizard.exe' : 'depthwizard')
@@ -119,14 +122,29 @@ async function createWindow(): Promise<void> {
     show: false,
     backgroundColor: '#0b1016',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    webPreferences: { preload: join(__dirname, 'preload.js'), contextIsolation: true, sandbox: false, nodeIntegration: false },
+    webPreferences: { preload: join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false },
+  })
+  const isLocal = (raw: string) => {
+    try {
+      const u = new URL(raw)
+      const port = DEV_URL ? new URL(DEV_URL).port : String(enginePort)
+      return (u.hostname === '127.0.0.1' || u.hostname === 'localhost') && (u.port === port || u.port === '8000')
+    } catch {
+      return false
+    }
+  }
+  win.webContents.on('will-navigate', (e, url) => {
+    if (!isLocal(url)) {
+      e.preventDefault()
+      shell.openExternal(url)
+    }
   })
   win.once('ready-to-show', () => {
     s.destroy()
     win?.show()
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://127.0.0.1') || url.startsWith('http://localhost')) return { action: 'allow' }
+    if (isLocal(url)) return { action: 'allow' }
     shell.openExternal(url)
     return { action: 'deny' }
   })
@@ -135,6 +153,8 @@ async function createWindow(): Promise<void> {
   buildMenu()
   // Development only: DW_DEBUG_PORT starts a loopback HTTP server that captures screenshots
   // (GET /shot?file=/abs/path.png) and evaluates JavaScript in the page (POST /eval, body = code).
+  // It runs arbitrary code in the window, so it is never enabled in packaged builds and should
+  // not be set while untrusted pages are open in a browser on the same machine.
   if (process.env.DW_DEBUG_PORT && !app.isPackaged) {
     const srv = http.createServer(async (req, res) => {
       try {
@@ -206,7 +226,7 @@ ipcMain.handle('dw:submit-path', async (_e, path: string, opts: Record<string, u
   const port = DEV_URL ? 8000 : enginePort
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({ path, ...opts })
-    const req = http.request({ host: '127.0.0.1', port, path: '/api/jobs/from-path', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, path: '/api/jobs/from-path', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), 'X-DW-Token': DESKTOP_TOKEN } }, (res) => {
       let data = ''
       res.on('data', (c) => (data += c))
       res.on('end', () => {
@@ -242,6 +262,7 @@ ipcMain.handle('dw:save-file', async (_e, url: string, suggestedName: string) =>
 })
 
 ipcMain.handle('dw:reveal-job', async (_e, id: string) => {
+  if (!/^[a-f0-9]{12}$/.test(id)) return
   const dir = app.isPackaged ? join(app.getPath('userData'), 'data', 'jobs', id) : join(REPO_ROOT, 'data', 'jobs', id)
   if (existsSync(dir)) shell.openPath(dir)
 })
@@ -258,4 +279,3 @@ app.on('before-quit', () => {
   }
 })
 process.on('exit', () => engine?.kill())
-writeFileSync(join(app.getPath('userData'), 'last-start.txt'), new Date().toISOString())

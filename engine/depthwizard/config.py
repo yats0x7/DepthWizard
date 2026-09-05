@@ -32,6 +32,14 @@ def ensure_ca_bundle() -> None:
         os.environ.setdefault(var, bundle)
 
 
+def _default_data_dir() -> Path:
+    """<repo>/data when running from the source tree, otherwise ~/.depthwizard/data."""
+    repo = Path(__file__).resolve().parents[2]
+    if (repo / "engine" / "pyproject.toml").exists() or (repo / "pyproject.toml").exists():
+        return repo / "data"
+    return Path.home() / ".depthwizard" / "data"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="DW_", env_file=".env", extra="ignore")
 
@@ -55,7 +63,9 @@ class Settings(BaseSettings):
     # outputs
     mesh_max_side: int = 768
     texture_max_side: int = 4096
-    data_dir: Path = Path(__file__).resolve().parents[2] / "data"  # <repo>/data
+    data_dir: Path = _default_data_dir()
+    desktop_token: str | None = None  # set by the desktop shell; enables /api/jobs/from-path
+    cors_origins: list[str] = ["http://127.0.0.1:5174", "http://localhost:5174"]
     static_dir: Path | None = None  # built studio to serve from the API
 
     hf_token: str | None = None
@@ -65,6 +75,9 @@ class Settings(BaseSettings):
 
     def jobs_dir(self) -> Path:
         return self.data_dir / "jobs"
+
+    def dem_cache_dir(self) -> Path:
+        return self.data_dir / "dem_cache"
 
 
 ensure_ca_bundle()

@@ -105,7 +105,21 @@ def recalibrate(
 
 
 @app.command()
-def serve(host: str = "127.0.0.1", port: int = 8000, static: Path | None = None, workers: int = 1) -> None:
+def prefetch(models: list[str] = typer.Argument(None, help="presets to download, default: small")) -> None:
+    """Download depth model weights now so later runs work offline."""
+    from .config import MODEL_PRESETS
+    from .depth.backbone import get_backbone
+
+    for m in models or ["small"]:
+        if m not in MODEL_PRESETS and "/" not in m:
+            console.print(f"[red]unknown preset {m}; choose from {sorted(MODEL_PRESETS)}[/]")
+            raise typer.Exit(1)
+        b = get_backbone(settings, m)
+        console.print(f"[green]ready[/] {b.name} on {b.device}")
+
+
+@app.command()
+def serve(host: str = "127.0.0.1", port: int = 8000, static: Path | None = None) -> None:
     """Serve the API and, when built, the studio UI."""
     import uvicorn
 

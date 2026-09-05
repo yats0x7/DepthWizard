@@ -1,6 +1,6 @@
 # DepthWizard - execution state
 
-Status: active (fresh rebuild started 2026-09-05 on user request) | Phase: verification | Mode: deep
+Status: review fixes applied, final commit pending | Phase: closing | Mode: deep
 
 ## Active truth
 - `docs/PROBLEM_STATEMENT.md` - ISRO problem statement 26175, authoritative requirements
@@ -30,6 +30,11 @@ Status: active (fresh rebuild started 2026-09-05 on user request) | Phase: verif
 5. README + pitch deck brief. DONE.
 6. Independent review. Pending.
 
+## Review outcome (2026-09-05)
+All three reviews returned; every high and medium finding was fixed and covered by tests where the
+engine was involved (33 tests). Remaining low items deliberately left: Docker uses CPU wheels outside
+the lockfile (documented), the dev-only debug server has no token (never enabled in packaged builds).
+
 ## Next action
-Confirm the Electron screenshot of the urban job in Presentation mode, fix lighting/sky issues,
-exercise the analysis tools, commit and push, then run the three reviews.
+Commit and push the review fixes; then optional: PyInstaller freeze of the engine for a
+self-contained installer, and a vitest suite for apps/studio/src/lib/terrain.ts.

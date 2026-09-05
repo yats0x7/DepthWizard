@@ -11,6 +11,7 @@ import numpy as np
 import rasterio
 from PIL import Image, ImageOps
 from rasterio.crs import CRS
+from rasterio.enums import ColorInterp
 from rasterio.transform import Affine, array_bounds
 from rasterio.warp import transform_bounds
 
@@ -109,8 +110,9 @@ def load_image(path: str | Path, max_dim: int = 6000) -> RasterInput:
             nodata_mask = None
             if ds.nodata is not None:
                 nodata_mask = np.all(data == ds.nodata, axis=0)
-            if count >= 4:
-                alpha = ds.read(count)
+            alpha_bands = [i + 1 for i, ci in enumerate(ds.colorinterp) if ci == ColorInterp.alpha]
+            if alpha_bands:  # RGB+NIR is not RGBA: only a band declared as alpha masks pixels
+                alpha = ds.read(alpha_bands[0])
                 nodata_mask = (alpha == 0) if nodata_mask is None else nodata_mask | (alpha == 0)
             bands = [_stretch_to_uint8(b, nodata_mask) for b in data]
             if len(bands) == 1:
@@ -205,7 +207,7 @@ def hillshade(
     slope = np.arctan(np.hypot(gx, gy))
     aspect = np.arctan2(-gx, gy)
     az, alt = np.radians(azimuth), np.radians(altitude)
-    shade = np.sin(alt) * np.cos(slope) + np.cos(alt) * np.sin(slope) * np.cos(az - np.pi / 2 - aspect)
+    shade = np.sin(alt) * np.cos(slope) + np.cos(alt) * np.sin(slope) * np.cos(az - aspect)
     return np.clip(shade, 0.0, 1.0).astype(np.float32)
 
 

@@ -93,3 +93,79 @@ def test_samples_and_from_sample(client, cfg, png_path):
     assert r.status_code == 202
     assert _wait(client, r.json()["id"])["status"] == "done"
     assert client.post("/api/jobs/from-sample", json={"name": "missing.png"}).status_code == 404
+
+
+def test_file_routes_reject_traversal(client, png_path, tmp_path, cfg):
+    with png_path.open("rb") as fh:
+        jid = client.post("/api/jobs", files={"file": ("scene.png", fh, "image/png")}).json()["id"]
+    _wait(client, jid)
+    assert client.get(f"/api/jobs/{jid}/files/input.png").status_code == 200
+    r = client.get(f"/api/jobs/{jid}/files/input.%2F..%2F..%2Fmeta.json")
+    assert r.status_code == 404 or "json" not in r.headers.get("content-type", "")
+    assert client.get("/api/jobs/%2E%2E/files/meta.json").status_code == 404
+    assert client.get(f"/api/jobs/{jid}/files/input.png%2F..%2Fmeta.json").status_code in (404, 200)
+    assert (
+        client.get("/%2E%2E/%2E%2E/etc/passwd")
+        .headers.get("content-type", "")
+        .startswith(("text/html", "application/json"))
+    )
+    assert client.get("/api/jobs/nope/files/meta.json").status_code == 404
+
+
+def test_events_stream_ends_for_finished_job(client, png_path):
+    with png_path.open("rb") as fh:
+        jid = client.post("/api/jobs", files={"file": ("scene.png", fh, "image/png")}).json()["id"]
+    _wait(client, jid)
+    with client.stream("GET", f"/api/jobs/{jid}/events") as r:
+        body = "".join(r.iter_text())
+    assert body.count("event: status") == 1
+
+
+def test_from_path_requires_token(client, png_path, cfg):
+    assert client.post("/api/jobs/from-path", json={"path": str(png_path)}).status_code == 404
+    cfg.desktop_token = "secret"
+    r = client.post("/api/jobs/from-path", json={"path": str(png_path)}, headers={"X-DW-Token": "secret"})
+    assert r.status_code == 202
+    assert _wait(client, r.json()["id"])["status"] == "done"
+    cfg.desktop_token = None
+
+
+def test_bad_gcps_and_model_are_422(client, png_path):
+    with png_path.open("rb") as fh:
+        r = client.post("/api/jobs", files={"file": ("s.png", fh, "image/png")}, data={"gcps": "nope"})
+    assert r.status_code == 422
+    with png_path.open("rb") as fh:
+        r = client.post("/api/jobs", files={"file": ("s.png", fh, "image/png")}, data={"model": "evil/repo"})
+    assert r.status_code == 422
+
+
+def test_validate_with_class_mask(client, geotiff_path, tmp_path):
+    import numpy as np
+    import rasterio
+
+    with geotiff_path.open("rb") as fh:
+        jid = client.post("/api/jobs", files={"file": ("scene.tif", fh, "image/tiff")}).json()["id"]
+    _wait(client, jid)
+    with rasterio.open(geotiff_path) as ds:
+        profile = ds.profile
+    profile.update(count=1, dtype="uint8", nodata=None)
+    mask_path = tmp_path / "classes.tif"
+    codes = np.ones((profile["height"], profile["width"]), np.uint8)
+    codes[:, : profile["width"] // 2] = 2
+    with rasterio.open(mask_path, "w", **profile) as ds:
+        ds.write(codes, 1)
+    with geotiff_path.open("rb") as ref, mask_path.open("rb") as cls:
+        r = client.post(
+            f"/api/jobs/{jid}/validate",
+            files={"file": ("ref.tif", ref, "image/tiff"), "classes": ("classes.tif", cls, "image/tiff")},
+            data={"class_names": '{"1": "urban", "2": "forest"}'},
+        )
+    assert r.status_code == 200, r.text
+    assert set(r.json()["per_class"]) == {"urban", "forest"}
+
+
+def test_delete_running_job_waits_for_worker(client, png_path):
+    with png_path.open("rb") as fh:
+        jid = client.post("/api/jobs", files={"file": ("scene.png", fh, "image/png")}).json()["id"]
+    assert client.delete(f"/api/jobs/{jid}").status_code == 200
+    assert client.get(f"/api/jobs/{jid}").status_code == 404

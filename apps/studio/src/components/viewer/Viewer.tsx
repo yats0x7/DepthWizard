@@ -20,7 +20,7 @@ function RendererConfig() {
     // Analysis: no tone mapping at all so colours are exactly the layer values.
     gl.toneMapping = mode === 'presentation' && !effects ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping
     gl.toneMappingExposure = 1.0
-    if (import.meta.env.DEV) (window as any).__dw = { ...(window as any).__dw, gl, scene }
+    if (import.meta.env.DEV) window.__dw = { ...window.__dw, gl, scene }
   }, [gl, scene, mode, effects])
   return null
 }
@@ -38,7 +38,7 @@ export function Viewer() {
       key={jobId}
       shadows={presentation ? 'soft' : false}
       dpr={[1, 2]}
-      gl={{ antialias: !(presentation && effects), powerPreference: 'high-performance', logarithmicDepthBuffer: false, stencil: false }}
+      gl={{ antialias: true, powerPreference: 'high-performance', logarithmicDepthBuffer: false, stencil: false }}
       camera={{ fov: 58, near: 0.05, far: 5000, position: [dims.sx * 0.55, dims.size * 0.42, dims.sz * 0.75] }}
       onCreated={({ gl, size }) => {
         if (import.meta.env.DEV) console.info('[dw] canvas', size.width, size.height)

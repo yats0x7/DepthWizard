@@ -26,7 +26,8 @@ export default function App() {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return
       const s = useStore.getState()
-      if (e.code === 'Tab' || e.code === 'KeyM') {
+      const onCanvasOrBody = !document.activeElement || document.activeElement === document.body || document.activeElement.tagName === 'CANVAS'
+      if (e.code === 'KeyM' || (e.code === 'Tab' && onCanvasOrBody && !e.shiftKey)) {
         e.preventDefault()
         s.setMode(s.mode === 'presentation' ? 'analysis' : 'presentation')
       } else if (e.code === 'Digit1') s.set('nav', 'orbit')
@@ -44,6 +45,7 @@ export default function App() {
     <div className="flex h-full w-full overflow-hidden bg-ground">
       {!hidePanels && <Sidebar />}
       <main className="relative min-w-0 flex-1">
+        {hf && (
         <button
           onClick={() => setHidePanels((v) => !v)}
           title={hidePanels ? 'Show panels (H)' : 'Hide panels (H)'}
@@ -51,6 +53,7 @@ export default function App() {
         >
           {hidePanels ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
         </button>
+        )}
         {hf ? (
           <>
             <Viewer />

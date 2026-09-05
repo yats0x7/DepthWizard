@@ -43,6 +43,7 @@ OUTPUT_FILES = (
     "metrics.json",
     "error_map.png",
     "reference.tif",
+    "classes.tif",
 )
 STAGES = ("load", "infer", "dem", "calibrate", "analyse", "export", "done")
 
@@ -307,9 +308,17 @@ def recalibrate(
 
 
 def validate(
-    out_dir: str | Path, reference_path: str | Path, classes: dict[str, np.ndarray] | None = None
+    out_dir: str | Path,
+    reference_path: str | Path,
+    classes: dict[str, np.ndarray] | None = None,
+    classes_path: str | Path | None = None,
+    class_names: dict[str, str] | None = None,
 ) -> dict:
-    """Compare the job's DSM with a reference raster; writes metrics.json and error_map.png."""
+    """Compare the job's DSM with a reference raster; writes metrics.json and error_map.png.
+
+    `classes_path` is an optional raster of integer landscape codes on any grid; `class_names` maps
+    codes (as strings) to names for the per-class breakdown, e.g. {"1": "urban", "2": "forest"}.
+    """
     out = Path(out_dir)
     meta = json.loads((out / "meta.json").read_text())
     name = meta["files"].get("dsm") or meta["files"].get("rdsm")
@@ -320,6 +329,13 @@ def validate(
     if crs is None or tr.is_identity:
         crs, tr = None, None
     ref = demmod.read_raster_on_grid(reference_path, crs, tr, pred.shape)
+    if classes_path is not None:
+        codes = demmod.read_raster_on_grid(classes_path, crs, tr, pred.shape, nearest=True)
+        classes = dict(classes or {})
+        present = [int(c) for c in np.unique(codes[np.isfinite(codes)])]
+        for code in present:
+            label = (class_names or {}).get(str(code), f"class {code}")
+            classes[label] = codes == code
     metrics = compare(pred, ref, classes=classes)
     metrics["reference"] = Path(reference_path).name
     metrics["units"] = meta.get("units")

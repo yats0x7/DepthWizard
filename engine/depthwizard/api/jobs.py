@@ -44,10 +44,13 @@ class JobManager:
                     continue
                 if st.get("status") in ("queued", "running"):
                     st.update(status="failed", error="interrupted by restart", message="interrupted")
+                    f.write_text(json.dumps(st))
                 self.jobs[st["id"]] = st
 
     def _save(self, st: dict) -> None:
-        (self.root / st["id"] / "status.json").write_text(json.dumps(st))
+        d = self.root / st["id"]
+        if d.exists():
+            (d / "status.json").write_text(json.dumps(st))
 
     def _emit(self, st: dict) -> None:
         for q in list(self.listeners.get(st["id"], [])):
@@ -58,7 +61,9 @@ class JobManager:
 
     def _update(self, jid: str, **fields) -> dict:
         with self.lock:
-            st = self.jobs[jid]
+            st = self.jobs.get(jid)
+            if st is None:  # deleted while running
+                return {"id": jid, "status": "cancelled", **fields}
             st.update(fields, updated=time.time())
             self._save(st)
             self._emit(st)
@@ -98,6 +103,7 @@ class JobManager:
         d.mkdir(parents=True, exist_ok=True)
         dest = d / ("input" + Path(name).suffix.lower())
         shutil.move(str(upload), dest)
+        shutil.rmtree(upload.parent, ignore_errors=True)
         now = time.time()
         st = {
             "id": jid,
@@ -139,6 +145,12 @@ class JobManager:
 
     def delete(self, jid: str) -> bool:
         self.cancel(jid)
+        fut = self.futures.get(jid)
+        if fut is not None and not fut.done():
+            try:  # let the worker notice the cancel flag before its directory disappears
+                fut.result(timeout=120)
+            except Exception:  # noqa: BLE001
+                pass
         with self.lock:
             st = self.jobs.pop(jid, None)
             self.futures.pop(jid, None)

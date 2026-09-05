@@ -12,7 +12,8 @@ def slope_aspect(z: np.ndarray, dx: float = 1.0, dy: float = 1.0) -> tuple[np.nd
     zz = np.where(valid, z, fill)
     gy, gx = np.gradient(zz, dy, dx)
     slope = np.degrees(np.arctan(np.hypot(gx, gy))).astype(np.float32)
-    aspect = (np.degrees(np.arctan2(gx, -gy)) + 360.0) % 360.0
+    # downslope direction: gy is dh/d(south), so north component is +gy
+    aspect = (np.degrees(np.arctan2(-gx, gy)) + 360.0) % 360.0
     slope[~valid] = np.nan
     aspect = aspect.astype(np.float32)
     aspect[~valid] = np.nan

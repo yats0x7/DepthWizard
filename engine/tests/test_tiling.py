@@ -8,20 +8,6 @@ def test_tiles_reconstruct_affine_consistent_field():
     y, x = np.mgrid[0:h, 0:w]
     truth = (np.sin(x / 30) + np.cos(y / 25)).astype(np.float32)
     rgb = np.zeros((h, w, 3), np.uint8)
-    calls = []
-
-    def infer(patch):
-        ph, pw = patch.shape[:2]
-        calls.append((ph, pw))
-        # each tile returns the truth in a random affine frame; small global pass is resized truth
-        if (ph, pw) == (h, w) or max(ph, pw) < 150:
-            import cv2
-
-            return cv2.resize(truth, (pw, ph))
-        # find the tile position via a hidden marker channel trick: use patch mean (all zero) -> use closure
-        return None
-
-    # Simpler: emulate by index bookkeeping
     tiles = []
 
     def infer2(patch):

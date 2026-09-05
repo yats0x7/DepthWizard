@@ -10,7 +10,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,8 +25,11 @@ from .schemas import PathRequest, RecalibrateRequest, SampleRequest
 
 log = logging.getLogger(__name__)
 ALLOWED = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".geotiff", ".jp2", ".img"}
+GEO_EXT = {".tif", ".tiff", ".geotiff", ".jp2", ".img"}
 REFERENCE_ALLOWED = {".tif", ".tiff", ".geotiff", ".img", ".png"}
+CALIBRATIONS = ("hybrid", "affine", "prior")
 MAX_UPLOAD = 1024 * 1024 * 1024  # 1 GB
+TERMINAL = ("done", "failed", "cancelled")
 
 
 def _default_static() -> Path | None:
@@ -39,7 +42,9 @@ def _default_static() -> Path | None:
 
 def create_app(cfg: Settings = default_settings) -> FastAPI:
     app = FastAPI(title="DepthWizard", version=__version__)
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+    app.add_middleware(
+        CORSMiddleware, allow_origins=list(cfg.cors_origins), allow_methods=["*"], allow_headers=["*"]
+    )
     jobs = JobManager(cfg)
     app.state.jobs = jobs
     app.state.cfg = cfg
@@ -59,6 +64,46 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
                     raise HTTPException(413, "upload larger than 1 GB")
                 fh.write(chunk)
         return tmp
+
+    def move_into(tmp: Path, dest: Path) -> Path:
+        shutil.move(str(tmp), dest)
+        shutil.rmtree(tmp.parent, ignore_errors=True)
+        return dest
+
+    def parse_options(model, calibration, dem_source, prior_p95_m, gcps: str | None = None) -> RunOptions:
+        if model and model not in MODEL_PRESETS and model != cfg.model:
+            raise HTTPException(422, f"unknown model preset {model}; choose one of {sorted(MODEL_PRESETS)}")
+        if dem_source and dem_source not in DEM_SOURCES:
+            raise HTTPException(422, f"unknown DEM source {dem_source}")
+        if calibration and calibration not in CALIBRATIONS:
+            raise HTTPException(422, f"unknown calibration mode {calibration}")
+        parsed = []
+        if gcps:
+            from .schemas import GCPIn
+
+            try:
+                parsed = parse_gcps([GCPIn(**g) for g in json.loads(gcps)])
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(422, f"gcps must be a JSON list of {{row, col, z}}: {exc}") from exc
+        return RunOptions(
+            model=model or None,
+            calibration=calibration or None,
+            dem_source=dem_source or None,
+            prior_p95_m=prior_p95_m,
+            gcps=parsed,
+        )
+
+    def require_job(jid: str) -> dict:
+        st = jobs.get(jid)
+        if not st:
+            raise HTTPException(404, "job not found")
+        return st
+
+    def require_done(jid: str) -> dict:
+        st = require_job(jid)
+        if st["status"] != "done":
+            raise HTTPException(409, "job is not finished")
+        return st
 
     @app.get("/api/health")
     def health() -> dict:
@@ -95,6 +140,8 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
     def warmup(model: str | None = None) -> dict:
         from ..depth.backbone import get_backbone
 
+        if model and model not in MODEL_PRESETS and model != cfg.model:
+            raise HTTPException(422, f"unknown model preset {model}")
         b = get_backbone(cfg, model)
         return {"model": b.name, "device": b.device}
 
@@ -111,25 +158,8 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
         prior_p95_m: float | None = Form(None),
         gcps: str | None = Form(None),
     ) -> dict:
+        opts = parse_options(model, calibration, dem_source, prior_p95_m, gcps)
         tmp = await save_upload(file, ALLOWED)
-        if model and model not in MODEL_PRESETS and "/" not in model:
-            raise HTTPException(422, f"unknown model preset {model}")
-        if dem_source and dem_source not in DEM_SOURCES:
-            raise HTTPException(422, f"unknown DEM source {dem_source}")
-        if calibration and calibration not in ("hybrid", "affine", "prior"):
-            raise HTTPException(422, f"unknown calibration mode {calibration}")
-        parsed = []
-        if gcps:
-            from .schemas import GCPIn
-
-            parsed = parse_gcps([GCPIn(**g) for g in json.loads(gcps)])
-        opts = RunOptions(
-            model=model or None,
-            calibration=calibration or None,
-            dem_source=dem_source or None,
-            prior_p95_m=prior_p95_m,
-            gcps=parsed,
-        )
         return jobs.submit(tmp, Path(file.filename).name, opts)
 
     def samples_dir() -> Path:
@@ -140,66 +170,52 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
         d = samples_dir()
         if not d.exists():
             return []
-        out = []
-        for p in sorted(d.iterdir()):
-            if p.suffix.lower() in ALLOWED and p.is_file():
-                out.append(
-                    {
-                        "name": p.name,
-                        "size": p.stat().st_size,
-                        "georeferenced": p.suffix.lower() in {".tif", ".tiff", ".geotiff", ".jp2", ".img"},
-                    }
-                )
-        return out
+        return [
+            {"name": p.name, "size": p.stat().st_size, "georeferenced": p.suffix.lower() in GEO_EXT}
+            for p in sorted(d.iterdir())
+            if p.is_file() and p.suffix.lower() in ALLOWED
+        ]
 
     @app.post("/api/jobs/from-sample", status_code=202)
     def create_from_sample(req: SampleRequest) -> dict:
         src = samples_dir() / Path(req.name).name
         if not src.is_file() or src.suffix.lower() not in ALLOWED:
             raise HTTPException(404, "sample not found")
+        opts = parse_options(req.model, req.calibration, req.dem_source, req.prior_p95_m)
         tmp = Path(tempfile.mkdtemp(prefix="dw-sample-")) / src.name
         shutil.copy2(src, tmp)
-        opts = RunOptions(
-            model=req.model or None,
-            calibration=req.calibration or None,
-            dem_source=req.dem_source or None,
-            prior_p95_m=req.prior_p95_m,
-        )
         return jobs.submit(tmp, src.name, opts)
 
     @app.post("/api/jobs/from-path", status_code=202)
-    def create_from_path(req: PathRequest) -> dict:
-        """Desktop app: run a local file without uploading it through the browser."""
+    def create_from_path(req: PathRequest, x_dw_token: str | None = Header(default=None)) -> dict:
+        """Desktop shell only: run a local file without uploading it. Needs the per-launch token."""
+        if not cfg.desktop_token or x_dw_token != cfg.desktop_token:
+            raise HTTPException(404, "not available")
         src = Path(req.path).expanduser()
         if not src.is_file() or src.suffix.lower() not in ALLOWED:
             raise HTTPException(404, "file not found or unsupported")
+        opts = parse_options(req.model, req.calibration, req.dem_source, req.prior_p95_m)
         tmp = Path(tempfile.mkdtemp(prefix="dw-path-")) / src.name
         shutil.copy2(src, tmp)
-        opts = RunOptions(
-            model=req.model or None,
-            calibration=req.calibration or None,
-            dem_source=req.dem_source or None,
-            prior_p95_m=req.prior_p95_m,
-        )
         return jobs.submit(tmp, src.name, opts)
 
     @app.get("/api/jobs/{jid}")
     def get_job(jid: str) -> dict:
-        st = jobs.get(jid)
-        if not st:
-            raise HTTPException(404, "job not found")
+        st = require_job(jid)
         st["meta"] = jobs.meta(jid)
         return st
 
     @app.get("/api/jobs/{jid}/events")
     async def job_events(jid: str):
-        if not jobs.get(jid):
-            raise HTTPException(404, "job not found")
+        require_job(jid)
         q = jobs.subscribe(jid)
 
         async def gen():
             try:
-                yield {"event": "status", "data": json.dumps(jobs.get(jid))}
+                first = jobs.get(jid)
+                yield {"event": "status", "data": json.dumps(first)}
+                if not first or first["status"] in TERMINAL:
+                    return
                 while True:
                     try:
                         st = q.get_nowait()
@@ -207,7 +223,7 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
                         await asyncio.sleep(0.1)
                         continue
                     yield {"event": "status", "data": json.dumps(st)}
-                    if st["status"] in ("done", "failed", "cancelled"):
+                    if st["status"] in TERMINAL:
                         break
             finally:
                 jobs.unsubscribe(jid, q)
@@ -229,10 +245,13 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
 
     @app.get("/api/jobs/{jid}/files/{name}")
     def job_file(jid: str, name: str):
-        if name not in OUTPUT_FILES and not name.startswith("input."):
+        require_job(jid)
+        safe_input = name.startswith("input.") and name[6:].isalnum()
+        if name not in OUTPUT_FILES and not safe_input:
             raise HTTPException(404, "unknown file")
-        path = jobs.dir(jid) / name
-        if not path.exists():
+        root = jobs.dir(jid).resolve()
+        path = (root / name).resolve()
+        if not path.is_relative_to(root) or not path.is_file():
             raise HTTPException(404, "file not available")
         media = {
             ".tif": "image/tiff",
@@ -249,24 +268,35 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
         )
 
     @app.post("/api/jobs/{jid}/validate")
-    async def validate_job(jid: str, file: UploadFile = File(...)) -> dict:
-        st = jobs.get(jid)
-        if not st or st["status"] != "done":
-            raise HTTPException(409, "job is not finished")
-        tmp = await save_upload(file, REFERENCE_ALLOWED)
-        dest = jobs.dir(jid) / "reference.tif"
-        shutil.move(str(tmp), dest)
+    async def validate_job(
+        jid: str,
+        file: UploadFile = File(...),
+        classes: UploadFile | None = File(None),
+        class_names: str | None = Form(None),
+    ) -> dict:
+        """Compare with a reference raster; an optional integer class raster gives per-landscape metrics."""
+        require_done(jid)
+        names = None
+        if class_names:
+            try:
+                names = {str(k): str(v) for k, v in json.loads(class_names).items()}
+            except (ValueError, AttributeError) as exc:
+                raise HTTPException(422, f"class_names must be a JSON object of code -> name: {exc}") from exc
+        dest = move_into(await save_upload(file, REFERENCE_ALLOWED), jobs.dir(jid) / "reference.tif")
+        classes_path = None
+        if classes is not None and classes.filename:
+            classes_path = move_into(
+                await save_upload(classes, REFERENCE_ALLOWED), jobs.dir(jid) / "classes.tif"
+            )
         try:
-            return await asyncio.to_thread(validate, jobs.dir(jid), dest)
+            return await asyncio.to_thread(validate, jobs.dir(jid), dest, None, classes_path, names)
         except Exception as exc:
             raise HTTPException(422, f"validation failed: {exc}") from exc
 
     @app.post("/api/jobs/{jid}/recalibrate")
     async def recalibrate_job(jid: str, req: RecalibrateRequest) -> dict:
-        st = jobs.get(jid)
-        if not st or st["status"] != "done":
-            raise HTTPException(409, "job is not finished")
-        if req.mode and req.mode not in ("hybrid", "affine", "prior"):
+        require_done(jid)
+        if req.mode and req.mode not in CALIBRATIONS:
             raise HTTPException(422, f"unknown calibration mode {req.mode}")
         try:
             return await asyncio.to_thread(
@@ -277,14 +307,16 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
 
     static = cfg.static_dir or _default_static()
     if static and (static / "index.html").exists():
-        app.mount("/assets", StaticFiles(directory=static / "assets"), name="assets")
+        root_dir = static.resolve()
+        app.mount("/assets", StaticFiles(directory=root_dir / "assets"), name="assets")
 
         @app.get("/{path:path}", include_in_schema=False)
         def spa(path: str):
-            target = static / path
-            if path and target.is_file():
+            target = (root_dir / path).resolve()
+            if path and target.is_relative_to(root_dir) and target.is_file():
                 return FileResponse(target)
-            return FileResponse(static / "index.html")
+            return FileResponse(root_dir / "index.html")
+
     else:
 
         @app.get("/", include_in_schema=False)
