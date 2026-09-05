@@ -13,7 +13,10 @@ out/
 release/
 *.tsbuildinfo
 # data, weights, outputs (never committed)
-data/
+data/*
+!data/benchmark/
+data/benchmark/*
+!data/benchmark/manifest.json
 *.pth
 *.safetensors
 *.glb

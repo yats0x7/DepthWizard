@@ -15,6 +15,8 @@ from .calibrate.fit import GCP
 from .config import settings
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="DepthWizard: single-image DSM engine")
+benchmark_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Run and report benchmark scenes")
+app.add_typer(benchmark_app, name="benchmark")
 console = Console()
 
 
@@ -116,6 +118,37 @@ def prefetch(models: list[str] = typer.Argument(None, help="presets to download,
             raise typer.Exit(1)
         b = get_backbone(settings, m)
         console.print(f"[green]ready[/] {b.name} on {b.device}")
+
+
+@benchmark_app.command("run")
+def benchmark_run_command(
+    manifest: Path = typer.Option(Path("data/benchmark/manifest.json"), "--manifest"),
+    out: Path = typer.Option(Path("data/benchmark"), "--out", "-o"),
+    scene: str | None = typer.Option(None, "--scene", help="Run one scene id instead of the full manifest"),
+) -> None:
+    """Fetch cached scene pairs, run the normal pipeline, and save benchmark results."""
+    from .benchmark.runner import benchmark_run
+
+    results = benchmark_run(manifest, out, settings, scene_id=scene)
+    for result in results:
+        m = result["metrics"]
+        raw = m.get("raw", {})
+        console.print(
+            f"[bold]{result['scene']['id']}[/] {result['scene']['landscape']} -> "
+            f"rmse {raw.get('rmse', float('nan')):.2f} m ({raw.get('n', 0)} px)"
+        )
+
+
+@benchmark_app.command("report")
+def benchmark_report_command(
+    root: Path = typer.Option(Path("data/benchmark"), "--root", "-r"),
+    output: Path = typer.Option(Path("docs/BENCHMARK.md"), "--output", "-o"),
+) -> None:
+    """Generate the per-scene and per-landscape benchmark Markdown table."""
+    from .benchmark.runner import benchmark_report
+
+    path = benchmark_report(root, output)
+    console.print(f"[green]wrote[/] {path}")
 
 
 @app.command()

@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "scenes": [
+    {
+      "id": "ahn-urban-amsterdam",
+      "landscape": "urban",
+      "bbox": [4.88, 52.35, 4.90, 52.37],
+      "imagery": {
+        "kind": "imagery",
+        "source": "sentinel2",
+        "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/31/U/FU/2024/8/S2B_31UFU_20240812_0_L2A/TCI.tif",
+        "license": "Copernicus Sentinel data, free and open",
+        "attribution": "Contains modified Copernicus Sentinel data 2024"
+      },
+      "reference": {
+        "kind": "url",
+        "source": "AHN4 DSM 0.5m",
+        "url": "https://service.pdok.nl/rws/ahn/wcs/v1_0?service=WCS&version=1.0.0&request=GetCoverage&coverage=dsm_05m&bbox=120441.72476158502%2C484797.8524855851%2C121819.36516274624%2C487013.7615222193&crs=EPSG:28992&response_crs=EPSG:28992&format=GeoTIFF&width=256&height=256",
+        "license": "Open Government Licence, Netherlands",
+        "attribution": "Actueel Hoogtebestand Nederland (AHN), PDOK"
+      },
+      "expected_gsd_m": 10,
+      "notes": "Independent AHN DSM reference; Sentinel-2 is used only as input imagery."
+    },
+    {
+      "id": "ahn-sparse-flevoland",
+      "landscape": "sparse",
+      "bbox": [5.45, 52.50, 5.47, 52.52],
+      "imagery": {
+        "kind": "imagery",
+        "source": "sentinel2",
+        "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/31/U/FU/2024/8/S2B_31UFU_20240812_0_L2A/TCI.tif",
+        "license": "Copernicus Sentinel data, free and open",
+        "attribution": "Contains modified Copernicus Sentinel data 2024"
+      },
+      "reference": {
+        "kind": "url",
+        "source": "AHN4 DSM 0.5m",
+        "url": "https://service.pdok.nl/rws/ahn/wcs/v1_0?service=WCS&version=1.0.0&request=GetCoverage&coverage=dsm_05m&bbox=159264.09392781305%2C501368.7526144833%2C160619.63820567797%2C503595.4830800416&crs=EPSG:28992&response_crs=EPSG:28992&format=GeoTIFF&width=256&height=256",
+        "license": "Open Government Licence, Netherlands",
+        "attribution": "Actueel Hoogtebestand Nederland (AHN), PDOK"
+      },
+      "expected_gsd_m": 10,
+      "notes": "Independent AHN DSM reference over agricultural/open land."
+    },
+    {
+      "id": "ahn-hilly-limburg",
+      "landscape": "hilly",
+      "bbox": [5.83, 50.84, 5.85, 50.86],
+      "imagery": {
+        "kind": "imagery",
+        "source": "sentinel2",
+        "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/31/U/GS/2025/8/S2A_31UGS_20250811_1_L2A/TCI.tif",
+        "license": "Copernicus Sentinel data, free and open",
+        "attribution": "Contains modified Copernicus Sentinel data 2025"
+      },
+      "reference": {
+        "kind": "url",
+        "source": "AHN4 DSM 0.5m",
+        "url": "https://service.pdok.nl/rws/ahn/wcs/v1_0?service=WCS&version=1.0.0&request=GetCoverage&coverage=dsm_05m&bbox=186191.5919060125%2C316777.89899028884%2C187586.33801488715%2C319011.583464665&crs=EPSG:28992&response_crs=EPSG:28992&format=GeoTIFF&width=256&height=256",
+        "license": "Open Government Licence, Netherlands",
+        "attribution": "Actueel Hoogtebestand Nederland (AHN), PDOK"
+      },
+      "expected_gsd_m": 10,
+      "notes": "Independent AHN DSM reference in the Limburg hills."
+    },
+    {
+      "id": "ahn-forested-veluwe",
+      "landscape": "forested",
+      "bbox": [5.78, 52.22, 5.80, 52.24],
+      "imagery": {
+        "kind": "imagery",
+        "source": "sentinel2",
+        "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/31/U/FT/2024/8/S2B_31UFT_20240812_0_L2A/TCI.tif",
+        "license": "Copernicus Sentinel data, free and open",
+        "attribution": "Contains modified Copernicus Sentinel data 2024"
+      },
+      "reference": {
+        "kind": "url",
+        "source": "AHN4 DSM 0.5m",
+        "url": "https://service.pdok.nl/rws/ahn/wcs/v1_0?service=WCS&version=1.0.0&request=GetCoverage&coverage=dsm_05m&bbox=181841.54224490697%2C470285.54382521904%2C183195.55074949798%2C472518.34878073295&crs=EPSG:28992&response_crs=EPSG:28992&format=GeoTIFF&width=256&height=256",
+        "license": "Open Government Licence, Netherlands",
+        "attribution": "Actueel Hoogtebestand Nederland (AHN), PDOK"
+      },
+      "expected_gsd_m": 10,
+      "notes": "Independent AHN DSM reference over Veluwe woodland."
+    },
+    {
+      "id": "3dep-urban-denver",
+      "landscape": "urban",
+      "bbox": [-104.99, 39.73, -104.97, 39.75],
+      "imagery": {
+        "kind": "imagery",
+        "source": "sentinel2",
+        "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/13/S/ED/2023/10/S2A_13SED_20231015_0_L2A/TCI.tif",
+        "license": "Copernicus Sentinel data, free and open",
+        "attribution": "Contains modified Copernicus Sentinel data 2023"
+      },
+      "reference": {
+        "kind": "url",
+        "source": "USGS 3DEP",
+        "url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?bbox=-104.99%2C39.73%2C-104.97%2C39.75&bboxSR=4326&imageSR=4326&size=256%2C256&format=tiff&pixelType=F32&noData=-9999&interpolation=RSP_Bilinear&f=image",
+        "license": "USGS public domain",
+        "attribution": "USGS 3D Elevation Program"
+      },
+      "expected_gsd_m": 10,
+      "notes": "Independent USGS 3DEP reference; reference is not used as the calibration DEM."
+    },
+    {
+      "id": "3dep-sparse-kansas",
+      "landscape": "sparse",
+      "bbox": [-97.35, 38.95, -97.33, 38.97],
+      "imagery": {
+        "kind": "imagery",
+        "source": "sentinel2",
+        "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/14/S/PJ/2024/9/S2A_14SPJ_20240903_0_L2A/TCI.tif",
+        "license": "Copernicus Sentinel data, free and open",
+        "attribution": "Contains modified Copernicus Sentinel data 2024"
+      },
+      "reference": {
+        "kind": "url",
+        "source": "USGS 3DEP",
+        "url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?bbox=-97.35%2C38.95%2C-97.33%2C38.97&bboxSR=4326&imageSR=4326&size=256%2C256&format=tiff&pixelType=F32&noData=-9999&interpolation=RSP_Bilinear&f=image",
+        "license": "USGS public domain",
+        "attribution": "USGS 3D Elevation Program"
+      },
+      "expected_gsd_m": 10,
+      "notes": "Independent USGS 3DEP reference over sparse agricultural land."
+    },
+    {
+      "id": "3dep-hilly-seattle",
+      "landscape": "hilly",
+      "bbox": [-122.35, 47.60, -122.33, 47.62],
+      "imagery": {
+        "kind": "imagery",
+        "source": "sentinel2",
+        "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/10/T/ET/2025/6/S2B_10TET_20250608_0_L2A/TCI.tif",
+        "license": "Copernicus Sentinel data, free and open",
+        "attribution": "Contains modified Copernicus Sentinel data 2025"
+      },
+      "reference": {
+        "kind": "url",
+        "source": "USGS 3DEP",
+        "url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?bbox=-122.35%2C47.60%2C-122.33%2C47.62&bboxSR=4326&imageSR=4326&size=256%2C256&format=tiff&pixelType=F32&noData=-9999&interpolation=RSP_Bilinear&f=image",
+        "license": "USGS public domain",
+        "attribution": "USGS 3D Elevation Program"
+      },
+      "expected_gsd_m": 10,
+      "notes": "Independent USGS 3DEP reference over hilly Seattle terrain."
+    },
+    {
+      "id": "3dep-forested-portland",
+      "landscape": "forested",
+      "bbox": [-122.75, 45.48, -122.73, 45.50],
+      "imagery": {
+        "kind": "imagery",
+        "source": "sentinel2",
+        "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/10/T/ER/2026/7/S2B_10TER_20260713_0_L2A/TCI.tif",
+        "license": "Copernicus Sentinel data, free and open",
+        "attribution": "Contains modified Copernicus Sentinel data 2026"
+      },
+      "reference": {
+        "kind": "url",
+        "source": "USGS 3DEP",
+        "url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?bbox=-122.75%2C45.48%2C-122.73%2C45.50&bboxSR=4326&imageSR=4326&size=256%2C256&format=tiff&pixelType=F32&noData=-9999&interpolation=RSP_Bilinear&f=image",
+        "license": "USGS public domain",
+        "attribution": "USGS 3D Elevation Program"
+      },
+      "expected_gsd_m": 10,
+      "notes": "Independent USGS 3DEP reference over forested Portland terrain."
+    }
+  ]
+}

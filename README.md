@@ -124,6 +124,14 @@ metrics; `error_map.png` shows signed error. For the per-landscape breakdown the
 asks for (urban, sparse, hilly, forested), add a class raster of integer codes in the Validate panel
 or the API and name the codes (`1=urban, 2=forest`).
 
+The reproducible benchmark uses the manifest at `data/benchmark/manifest.json`; downloaded imagery,
+references and job outputs remain outside git. Run `depthwizard benchmark run --manifest
+data/benchmark/manifest.json --out data/benchmark` followed by `depthwizard benchmark report
+--root data/benchmark --output docs/BENCHMARK.md` to regenerate the evidence table. The current
+eight-scene baseline covers two urban, two sparse, two hilly and two forested scenes from Sentinel-2
+imagery, validated independently against AHN4 or USGS 3DEP height data; see `docs/BENCHMARK.md` for
+the measured raw and aligned results and provenance.
+
 Height conventions: aspect is the downslope bearing clockwise from north; the hillshade preview is
 lit from the north-west; terrain tiles are clamped at sea level so oceans calibrate as a 0 m surface.
 
