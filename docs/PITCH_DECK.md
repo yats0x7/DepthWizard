@@ -176,7 +176,7 @@ to 8 minutes. Slides 1 to 6 of the Idea deck are reused where noted.
 | 4 | Live: from upload to flythrough | Screenshot of the upload screen with the job progressing; this is where the live demo starts | 3:00 demo |
 | 5 | Three stages, each one measurable | Idea slide 3 | 1:00 |
 | 6 | Relative depth becomes metres with terrain we already have | Diagram: DEM (smooth) + model structure (sharp) = DSM; small equation `DSM = DEM + a · structure` in amber; GCP inset "1 point fixes offset, 2 fix scale" | 0:45 |
-| 7 | Accuracy on `[dataset]`: RMSE `[x]` m, MAE `[y]` m, r `[z]` | Table of raw vs aligned metrics for 3 or 4 scenes (urban, sparse, hilly, forested) and `error_map.png`; every number from `metrics.json` | 1:00 |
+| 7 | Accuracy on 8 open scenes: raw/aligned RMSE by landscape | Table from `docs/BENCHMARK.md`: urban 7.692/6.001 m, sparse 10.497/4.471 m, hilly 3.130/2.998 m, forested 5.846/4.735 m; include raw/aligned MAE, bias, NMAD, Pearson r, ≤1 m/≤3 m and linked error maps | 1:00 |
 | 8 | Every height you read is the DSM, not the render | `analysis.png`; callouts: "probe reads the array", "exaggeration locked at 1.0 in Analysis", "wireframe shows exact vertices" | 0:35 |
 | 9 | Presentation mode makes the same data legible | `hero.png` next to `analysis.png`, the toggle circled; caption "same geometry, different lighting" | 0:25 |
 | 10 | Ships as a desktop app and as containers | Screenshot of the Electron app window with the macOS/Windows/Linux icons and `docker compose up` in a small code box | 0:25 |
@@ -184,9 +184,11 @@ to 8 minutes. Slides 1 to 6 of the Idea deck are reused where noted.
 | 12 | What we would do with three more months | 4 bullets: fine-tuned decoder on aerial DSM sets; semantic priors (roads and water flat); uncertainty maps per pixel; batch mode for whole scenes | 0:20 |
 | 13 | Thank you, questions | Team photo, GitHub link, QR code to the repo | — |
 
-Slide 7 is the slide the jury remembers: 50% of the score is accuracy. Put the metric numbers at
-54 pt amber, the dataset name and tile id at 14 pt muted right under them. If a landscape class is
-weak, show it anyway and say why; hiding it costs more than showing it.
+Slide 7 is the slide the jury remembers: 50% of the score is accuracy. Put the measured class-level
+RMSE pairs above at 54 pt amber, the scene ids and source products at 14 pt muted underneath, and
+show one error map per landscape. If a landscape class is weak, show it anyway and say why; hiding
+it costs more than showing it. The semantic prior is an opt-in A/B result, not part of these baseline
+numbers.
 
 ### Live demo script (3 minutes, slide 4 on screen behind the app)
 

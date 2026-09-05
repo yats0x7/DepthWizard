@@ -13,6 +13,7 @@ import math
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 import numpy as np
 import rasterio
@@ -38,6 +39,10 @@ SOURCES = {
         "license": "Copernicus open",
     },
 }
+SOURCE_HOSTS = {
+    "oam": {"oin-hotosm-temp.s3.amazonaws.com", "oin-hotosm.s3.amazonaws.com"},
+    "sentinel2": {"sentinel-cogs.s3.us-west-2.amazonaws.com"},
+}
 
 BBox = tuple[float, float, float, float]  # west, south, east, north (EPSG:4326)
 
@@ -59,6 +64,16 @@ class ImageryItem:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+def validate_item(item: ImageryItem) -> None:
+    """Reject untrusted area-job URLs before GDAL opens them (prevents arbitrary SSRF)."""
+    hosts = SOURCE_HOSTS.get(item.source)
+    parsed = urlparse(item.url)
+    if hosts is None:
+        raise ValueError(f"unsupported imagery source: {item.source}")
+    if parsed.scheme != "https" or parsed.hostname not in hosts:
+        raise ValueError(f"{item.source} imagery URL must be HTTPS on an approved source host")
 
 
 def bbox_around(lon: float, lat: float, size_km: float) -> BBox:

@@ -132,6 +132,18 @@ eight-scene baseline covers two urban, two sparse, two hilly and two forested sc
 imagery, validated independently against AHN4 or USGS 3DEP height data; see `docs/BENCHMARK.md` for
 the measured raw and aligned results and provenance.
 
+The baseline per-class raw/aligned RMSE is urban 7.692/6.001 m, sparse 10.497/4.471 m, hilly
+3.130/2.998 m, and forested 5.846/4.735 m. These are measured results, including the weak classes,
+not a product guarantee. The opt-in semantic flat-surface prior is benchmarked A/B in the same
+report; it improves some urban/sparse scenes and degrades the hilly/forested cases, so it remains
+explicitly opt-in.
+
+For georeferenced work, the Studio Map tab supports Photon place search, a draggable coordinate
+pin and box, licensed OpenAerialMap or Sentinel-2 source selection, and fetch-and-run jobs. Source
+URLs are allow-listed, fetched only for the selected box, and the provider, licence, and attribution
+are retained in the job metadata and card. The map basemap uses OpenFreeMap/OpenStreetMap tiles;
+it is not used as a pixel source.
+
 Height conventions: aspect is the downslope bearing clockwise from north; the hillshade preview is
 lit from the north-west; terrain tiles are clamped at sea level so oceans calibrate as a 0 m surface.
 

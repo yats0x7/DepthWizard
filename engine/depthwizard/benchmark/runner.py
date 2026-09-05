@@ -156,7 +156,7 @@ def benchmark_run(
     return results
 
 
-def benchmark_report(root: str | Path, output: str | Path) -> Path:
+def benchmark_report(root: str | Path, output: str | Path, compare_root: str | Path | None = None) -> Path:
     root = Path(root)
     rows = [json.loads(p.read_text()) for p in sorted((root / "runs").glob("*/benchmark.json"))]
     if not rows:
@@ -200,7 +200,7 @@ def benchmark_report(root: str | Path, output: str | Path) -> Path:
     ]
     for row in rows:
         s = row["scene"]
-        error_map = row["metrics"].get("error_map", "—")
+        error_map = f"benchmark/errors/{s['id']}.png" if row["metrics"].get("error_map") else "—"
         lines.append(
             f"| {s['id']} | {s['landscape']} | {s['imagery']['source']} | {s['imagery']['license']} | "
             f"{s['reference']['source']} | {s['reference']['license']} | "
@@ -220,6 +220,33 @@ def benchmark_report(root: str | Path, output: str | Path) -> Path:
             value = block.get(field)
             return "—" if value is None else (f"{value * 100:.1f}%" if pct else f"{value:.3f}")
         lines.append(f"| {name} | {len(class_rows)} | {f(raw, 'rmse')} | {f(raw, 'mae')} | {f(raw, 'bias')} | {f(raw, 'nmad')} | {f(raw, 'pearson_r')} | {f(raw, 'within_1m', True)} | {f(raw, 'within_3m', True)} | {f(aligned, 'rmse')} | {f(aligned, 'mae')} | {f(aligned, 'bias')} | {f(aligned, 'nmad')} | {f(aligned, 'pearson_r')} | {f(aligned, 'within_1m', True)} | {f(aligned, 'within_3m', True)} |")
+    if compare_root:
+        comparison = {r["scene"]["id"]: r for r in (Path(compare_root) / "runs").glob("*/benchmark.json") for r in [json.loads(r.read_text())]}
+        lines += [
+            "",
+            "## Semantic-prior A/B",
+            "",
+            "The semantic route is opt-in. This comparison uses the same eight image/reference pairs "
+            "as the baseline and reports the change in raw and aligned RMSE; negative is better. "
+            "The route is retained because it is a measured option, not claimed as a universal gain.",
+            "",
+            "| Scene | Class | Baseline raw RMSE | Semantic raw RMSE | Δ raw | Baseline aligned RMSE | Semantic aligned RMSE | Δ aligned |",
+            "|---|---|---:|---:|---:|---:|---:|---:|",
+        ]
+        for row in rows:
+            other = comparison.get(row["scene"]["id"])
+            if not other:
+                continue
+            base_raw = row["metrics"].get("raw", {}).get("rmse")
+            sem_raw = other["metrics"].get("raw", {}).get("rmse")
+            base_aligned = row["metrics"].get("aligned", {}).get("rmse")
+            sem_aligned = other["metrics"].get("aligned", {}).get("rmse")
+            if None in (base_raw, sem_raw, base_aligned, sem_aligned):
+                continue
+            lines.append(
+                f"| {row['scene']['id']} | {row['scene']['landscape']} | {base_raw:.3f} | {sem_raw:.3f} | "
+                f"{sem_raw - base_raw:+.3f} | {base_aligned:.3f} | {sem_aligned:.3f} | {sem_aligned - base_aligned:+.3f} |"
+            )
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines) + "\n")

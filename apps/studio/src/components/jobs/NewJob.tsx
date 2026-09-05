@@ -35,6 +35,7 @@ export function RunOptionsForm({ opts, setOpts }: { opts: RunOptions; setOpts: (
           <option value="hybrid">Hybrid (DEM + structure)</option>
           <option value="affine">Affine fit to DEM</option>
           <option value="prior">Scene prior only</option>
+          <option value="semantic">Semantic flat-surface prior (opt-in)</option>
         </Select>
       </Field>
       <Field label="Terrain source">

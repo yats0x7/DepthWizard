@@ -23,14 +23,14 @@ The URLs below are the manifest's declared sources. They are included here so th
 
 | Scene | Class | Imagery source | Imagery licence | Reference source | Reference licence | Expected GSD | Error map |
 |---|---|---|---|---|---|---:|---|
-| 3dep-forested-portland | forested | sentinel2 | Copernicus Sentinel data, free and open | USGS 3DEP | USGS public domain | 10.0 m | `error_map.png` |
-| 3dep-hilly-seattle | hilly | sentinel2 | Copernicus Sentinel data, free and open | USGS 3DEP | USGS public domain | 10.0 m | `error_map.png` |
-| 3dep-sparse-kansas | sparse | sentinel2 | Copernicus Sentinel data, free and open | USGS 3DEP | USGS public domain | 10.0 m | `error_map.png` |
-| 3dep-urban-denver | urban | sentinel2 | Copernicus Sentinel data, free and open | USGS 3DEP | USGS public domain | 10.0 m | `error_map.png` |
-| ahn-forested-veluwe | forested | sentinel2 | Copernicus Sentinel data, free and open | AHN4 DSM 0.5m | Open Government Licence, Netherlands | 10.0 m | `error_map.png` |
-| ahn-hilly-limburg | hilly | sentinel2 | Copernicus Sentinel data, free and open | AHN4 DSM 0.5m | Open Government Licence, Netherlands | 10.0 m | `error_map.png` |
-| ahn-sparse-flevoland | sparse | sentinel2 | Copernicus Sentinel data, free and open | AHN4 DSM 0.5m | Open Government Licence, Netherlands | 10.0 m | `error_map.png` |
-| ahn-urban-amsterdam | urban | sentinel2 | Copernicus Sentinel data, free and open | AHN4 DSM 0.5m | Open Government Licence, Netherlands | 10.0 m | `error_map.png` |
+| 3dep-forested-portland | forested | sentinel2 | Copernicus Sentinel data, free and open | USGS 3DEP | USGS public domain | 10.0 m | `benchmark/errors/3dep-forested-portland.png` |
+| 3dep-hilly-seattle | hilly | sentinel2 | Copernicus Sentinel data, free and open | USGS 3DEP | USGS public domain | 10.0 m | `benchmark/errors/3dep-hilly-seattle.png` |
+| 3dep-sparse-kansas | sparse | sentinel2 | Copernicus Sentinel data, free and open | USGS 3DEP | USGS public domain | 10.0 m | `benchmark/errors/3dep-sparse-kansas.png` |
+| 3dep-urban-denver | urban | sentinel2 | Copernicus Sentinel data, free and open | USGS 3DEP | USGS public domain | 10.0 m | `benchmark/errors/3dep-urban-denver.png` |
+| ahn-forested-veluwe | forested | sentinel2 | Copernicus Sentinel data, free and open | AHN4 DSM 0.5m | Open Government Licence, Netherlands | 10.0 m | `benchmark/errors/ahn-forested-veluwe.png` |
+| ahn-hilly-limburg | hilly | sentinel2 | Copernicus Sentinel data, free and open | AHN4 DSM 0.5m | Open Government Licence, Netherlands | 10.0 m | `benchmark/errors/ahn-hilly-limburg.png` |
+| ahn-sparse-flevoland | sparse | sentinel2 | Copernicus Sentinel data, free and open | AHN4 DSM 0.5m | Open Government Licence, Netherlands | 10.0 m | `benchmark/errors/ahn-sparse-flevoland.png` |
+| ahn-urban-amsterdam | urban | sentinel2 | Copernicus Sentinel data, free and open | AHN4 DSM 0.5m | Open Government Licence, Netherlands | 10.0 m | `benchmark/errors/ahn-urban-amsterdam.png` |
 
 ## Per-class weighted results
 
@@ -40,3 +40,18 @@ The URLs below are the manifest's declared sources. They are included here so th
 | hilly | 2 | 3.130 | 1.854 | 0.657 | 1.498 | 0.991 | 55.5% | 81.8% | 2.998 | 1.865 | -0.000 | 1.522 | 0.991 | 48.9% | 82.5% |
 | sparse | 2 | 10.497 | 8.032 | 4.707 | 6.925 | 0.335 | 9.5% | 26.7% | 4.471 | 3.544 | -0.000 | 4.257 | 0.335 | 23.1% | 60.8% |
 | urban | 2 | 7.692 | 5.956 | 0.602 | 7.009 | 0.430 | 11.3% | 33.3% | 6.001 | 4.818 | 0.000 | 5.903 | 0.430 | 11.6% | 35.8% |
+
+## Semantic-prior A/B
+
+The semantic route is opt-in. This comparison uses the same eight image/reference pairs as the baseline and reports the change in raw and aligned RMSE; negative is better. The route is retained because it is a measured option, not claimed as a universal gain.
+
+| Scene | Class | Baseline raw RMSE | Semantic raw RMSE | Δ raw | Baseline aligned RMSE | Semantic aligned RMSE | Δ aligned |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 3dep-forested-portland | forested | 8.587 | 14.772 | +6.185 | 6.616 | 14.733 | +8.117 |
+| 3dep-hilly-seattle | hilly | 2.683 | 11.564 | +8.881 | 2.502 | 11.526 | +9.024 |
+| 3dep-sparse-kansas | sparse | 10.106 | 7.525 | -2.581 | 6.305 | 5.802 | -0.503 |
+| 3dep-urban-denver | urban | 9.564 | 5.650 | -3.915 | 6.586 | 5.040 | -1.546 |
+| ahn-forested-veluwe | forested | 2.697 | 6.053 | +3.356 | 2.573 | 3.268 | +0.694 |
+| ahn-hilly-limburg | hilly | 4.177 | 17.266 | +13.088 | 4.161 | 13.258 | +9.098 |
+| ahn-sparse-flevoland | sparse | 11.006 | 7.253 | -3.752 | 2.084 | 2.084 | -0.000 |
+| ahn-urban-amsterdam | urban | 5.305 | 6.612 | +1.307 | 5.255 | 5.391 | +0.136 |
