@@ -1,0 +1,30 @@
+appId: dev.yatharth.depthwizard
+productName: DepthWizard
+copyright: Copyright © 2026 Yatharth
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist/**
+  - package.json
+extraResources:
+  - from: ../studio/dist
+    to: studio
+  - from: ../../engine/build/depthwizard
+    to: engine
+    filter: ["**/*"]
+mac:
+  category: public.app-category.productivity
+  target: [dmg, zip]
+  icon: resources/icon.icns
+  hardenedRuntime: false
+win:
+  target: [nsis]
+  icon: resources/icon.ico
+linux:
+  target: [AppImage]
+  category: Science
+  icon: resources/icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

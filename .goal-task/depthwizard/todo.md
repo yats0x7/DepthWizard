@@ -1,35 +1,25 @@
-# DepthWizard TODO
+# DepthWizard TODO (rebuild)
 
-## Phase 1 - scaffold
-- [x] backend pyproject, package skeleton, config
-- [x] frontend Vite scaffold with deps
+## Engine
+- [x] package, config (presets, DEM sources), raster I/O, tiling, backbone (TTA, fp16)
+- [x] calibration with robust ground trend, DEM cache + terrarium, GLB, analysis, metrics
+- [x] pipeline with progress/cancel, JobManager with SSE, API (jobs, samples, from-path,
+      validate, recalibrate, files), CLI
+- [x] 19 tests green, ruff clean; real run on oam_urban.tif (metric DSM 21-49 m, 35 s on MPS)
 
-## Phase 2 - backend pipeline
-- [x] io: load PNG/JPG/GeoTIFF, write GeoTIFF/PNG
-- [x] depth: HF Depth Anything V2 backbone, tiling, device auto
-- [x] calibrate: relative height, SRTM fetch, RANSAC fit, GCP, priors
-- [x] mesh: GLB export
-- [x] eval: metrics
-- [x] tests (synthetic rasters, backbone mocked)
+## Studio
+- [x] theme, API client, terrain math, store, UI primitives, HUD, panels, landing, jobs
+- [x] viewer: terrain material layers, proxy picking, camera rig, atmosphere, effects
+- [x] verify Presentation lighting/sky on a real GPU (Electron screenshot, own sky dome shader)
+- [x] verify walk, probe, profile, flood, GCP recalibrate, validation, PNG path end to end
+- [ ] design pass at desktop + narrow widths (Impeccable craft floor)
 
-## Phase 3 - API + CLI
-- [x] FastAPI: POST /jobs, GET /jobs/{id}, GET files, POST /jobs/{id}/validate
-- [x] Typer CLI: `depthwizard run image.tif --out dir`
+## Desktop / packaging
+- [x] Electron main + preload, screenshot mode, builder config
+- [x] Electron smoke test (dev URL + built studio, 60 fps on Apple GPU)
+- [x] Dockerfile + compose, README
 
-## Phase 4 - frontend
-- [x] upload + job status
-- [x] viewer: geotiff -> martini mesh -> textured terrain
-- [x] first-person controls, probe, slope, flood, profile, validation panel
-
-## Phase 5 - packaging + docs
-- [x] Dockerfiles + compose
-- [ ] Electron desktop app (main process spawns API, loads UI, electron-builder config) replacing the Tauri draft
-- [x] README
-
-## Phase 6 - review
-- [ ] 3 independent reviewers, fix findings, final commit
-
-## Phase 5b - real-data verification
-- [x] run real model on Landsat GeoTIFF (found and fixed calibration outliers)
-- [ ] run real model on the urban aerial crop (data/samples/oam_urban.tif)
-- [ ] drive the web app in the browser and fix UX issues
+## Docs / process
+- [x] docs/PITCH_DECK.md
+- [x] commit milestone, push to yats0x7/DepthWizard main
+- [ ] 3 independent reviews, fix findings, final commit + push

@@ -2,33 +2,15 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "backend",
+      "name": "engine",
       "runtimeExecutable": "uv",
-      "runtimeArgs": [
-        "run",
-        "--directory",
-        "backend",
-        "uvicorn",
-        "depthwizard.api.app:app",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        "8000"
-      ],
+      "runtimeArgs": ["run", "--directory", "engine", "depthwizard", "serve", "--host", "127.0.0.1", "--port", "8000"],
       "port": 8000
     },
     {
-      "name": "frontend",
+      "name": "studio",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--dir",
-        "frontend",
-        "dev",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        "5174"
-      ],
+      "runtimeArgs": ["--filter", "@depthwizard/studio", "dev"],
       "port": 5174
     }
   ]

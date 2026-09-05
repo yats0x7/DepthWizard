@@ -1,31 +1,55 @@
-# DepthWizard - design decisions
+# DepthWizard - design decisions (rebuild, 2026-09-05)
 
-## Layout (monorepo)
-- `backend/` Python 3.12 package `depthwizard` managed with uv. FastAPI API + Typer CLI.
-- `frontend/` Vite + React 19 + TypeScript + Tailwind + react-three-fiber + drei + zustand + geotiff.js + @mapbox/martini.
-- `desktop/` Electron app (electron-builder) that spawns the Python API as a child process and loads the web app from it. Electron chosen over Tauri: bundled Chromium gives consistent WebGL2 for the three.js viewer on every OS and packaging needs no Rust toolchain.
-- `docker/` Dockerfiles and compose.
+## Layout (pnpm workspace + uv)
+- `engine/` Python 3.13 package `depthwizard` (uv, hatchling). FastAPI API + Typer CLI. Data lives
+  in `<repo>/data` (samples, jobs, dem_cache), overridable with `DW_DATA_DIR`.
+- `apps/studio/` Vite + React 19 + TypeScript + Tailwind 4 + react-three-fiber 9 + drei 10 +
+  @react-three/postprocessing + zustand + geotiff.js + three-mesh-bvh + recharts + motion + radix-ui.
+- `apps/desktop/` Electron 38 (TypeScript main + preload, electron-builder). Spawns
+  `uv run depthwizard serve` on a free port, waits for `/api/health`, loads the studio the engine
+  serves from `apps/studio/dist`. `DW_DEV_URL` loads the Vite server instead. `DW_SCREENSHOT` /
+  `DW_OPEN_JOB` capture the window for headless verification.
+- `docker/engine.Dockerfile` builds the studio (node stage) and the engine (python stage) into one
+  image; `docker-compose.yml` at the root.
 
 ## Pipeline
-1. `io.load`: PIL/rasterio read; detect georeferencing (CRS + non-identity transform).
-2. `depth.DepthAnythingBackbone`: HF transformers `depth-anything/Depth-Anything-V2-{Small,Base}-hf`, device auto (cuda > mps > cpu), tiled inference with overlap and cosine-window blending, optional fine-tuned weights path (`DW_FINETUNED`).
-3. `calibrate`: relative depth -> relative height (invert, normalise). Georeferenced: fetch SRTM via `dem-stitcher`, downsample prediction to DEM grid, RANSAC affine fit (scale, offset) to metric elevation, optional GCP CSV refit, optional flat-surface priors mask. Output DSM = fitted surface.
-4. `mesh`: heightfield -> indexed triangle mesh with UVs, texture = source image, export GLB via trimesh.
-5. `eval`: RMSE, MAE, Pearson r, per-mask breakdown against a reference raster resampled with rasterio.
-6. `api`: background jobs in-process (ThreadPool), results on disk under `data/jobs/<id>/`.
+1. `raster.io.load_image`: PNG/JPG via Pillow, GeoTIFF via rasterio, downscale above `max_dim`.
+2. `depth.backbone.DepthAnythingBackbone`: HF Depth Anything V2 presets small/base/large, fp16 on
+   CUDA, flip TTA, tiled inference (`depth.tiling`) aligned to one global pass.
+3. `calibrate.fit`: `ground_trend` (asymmetric Gaussian smoothing on a coarse grid, unbiased on
+   slopes, ignores objects above ground), `clip_structure`, RANSAC affine trend-vs-DEM, modes
+   hybrid / affine / prior, `apply_gcps` (1 = offset, 2+ = scale+offset).
+4. `calibrate.dem`: cached fetch; `terrarium` (AWS Terrain Tiles, seconds) default, dem-stitcher
+   sources optional.
+5. `mesh.glb`: textured GLB, X east / Y up / Z south, centred, metres.
+6. `analysis.terrain`: slope/aspect, histogram, surface statistics in meta.json.
+7. `eval.metrics`: raw + aligned RMSE/MAE/bias/NMAD/r/p90/within-1m/3m, per-class, error map.
+8. `pipeline.run/recalibrate/validate` with stage progress callbacks and cancellation.
+9. `api`: JobManager (one worker, status.json, SSE event stream), samples and from-path endpoints
+   for the desktop app, static studio serving.
 
-## Frontend
-- Viewer loads `dsm.tif` with geotiff.js, builds mesh via martini (error-controlled LOD), drapes `texture.jpg`.
-- Controls: orbit (default) and first-person (PointerLock, WASD + mouse, shift to sprint, Q/E vertical).
-- Tools: height probe (raycast), slope shading toggle, flood level slider (water plane), cross-section profile (two clicks -> chart), validation panel (upload reference -> metrics), vertical exaggeration.
-- State in zustand; API client with fetch; dark UI with Tailwind.
-
-## Calibration robustness (added after the Landsat run)
-- Low-pass filtering is NaN-aware (normalised convolution) so nodata borders create no halos.
-- The structure term is clipped to its 0.2-99.8 percentile range before scaling.
-- DEM gaps are filled with the nearest valid value, not the mean.
-- The package sets SSL_CERT_FILE / REQUESTS_CA_BUNDLE / CURL_CA_BUNDLE to certifi when unset.
+## Studio
+- One `Viewer` canvas; `Terrain` builds a regular grid of exact DSM samples (`meshDetail` sets the
+  stride, never averaging), full-resolution float height texture for the fragment layers.
+- `TerrainMaterial`: stock MeshStandardMaterial (Presentation) or MeshBasicMaterial (Analysis)
+  extended with onBeforeCompile: hypsometric (turbo), slope (viridis), aspect (hue), hillshade,
+  contours (minor/major), flood tint, analytic hillshade for Analysis. Colour only.
+- Picking: coarse proxy grid with a three-mesh-bvh tree; hit gives x/z, every readout samples the
+  DSM array bilinearly (`lib/terrain.sampleHeight`). In fly/walk the crosshair ray-marches the DSM.
+- `CameraRig`: orbit (drei OrbitControls), fly and walk (pointer lock, WASD/QE, momentum, damped
+  look, eye height clamped to the DSM, head-bob in Presentation only), eased viewpoint transitions,
+  telemetry for the HUD. Tight near/far from scene size, no logarithmic depth buffer.
+- `Atmosphere`: drei Sky sized below the far plane, warm low sun default, directional shadow map,
+  hemisphere fill, fog matched to the horizon colour. Analysis: flat backdrop, no fog.
+- `Effects` (Presentation only): N8AO, bloom, ACES tone mapping, vignette, SMAA.
+- HUD: mode switch (Tab), exaggeration readout always visible (locked ×1.00 in Analysis),
+  crosshair, compass + altitude, minimap from preview.png with view cone, height readout with source.
+- Inspector: View / Analyse / Validate / Data panels. Sidebar: dropzone with run options, samples,
+  live job list (SSE). Landing with stage stepper for running jobs.
 
 ## Invariants
-- Output GeoTIFF: Float32, nodata = -9999, CRS and transform copied from input; relative DSM for non-georeferenced input written as plain TIFF + 16-bit PNG.
-- Never commit weights, job data, or node_modules.
+- Geometry is sacred: vertex positions are DSM samples in both modes; exaggeration is a visible
+  slider (default 1.0, locked in Analysis) applied as a group scale; no vertex-shader displacement.
+- Output GeoTIFF Float32, nodata −9999, CRS/transform copied from input; relative DSM for
+  ungeoreferenced input written as `rdsm.tif` plus 16-bit PNG.
+- Never commit weights, job data, samples, node_modules or dist.

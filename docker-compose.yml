@@ -1,0 +1,20 @@
+services:
+  depthwizard:
+    build:
+      context: .
+      dockerfile: docker/engine.Dockerfile
+    image: depthwizard:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - depthwizard-data:/data
+      - hf-cache:/root/.cache/huggingface
+    environment:
+      DW_MODEL: small
+      DW_DEM_SOURCE: terrarium
+      DW_DEVICE: auto
+    restart: unless-stopped
+
+volumes:
+  depthwizard-data:
+  hf-cache:

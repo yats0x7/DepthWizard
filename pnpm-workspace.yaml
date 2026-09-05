@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+  - electron-winstaller
+allowBuilds:
+  electron: true
+  esbuild: true
+  electron-winstaller: true

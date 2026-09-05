@@ -1,42 +1,35 @@
 # DepthWizard - execution state
 
-Status: active (restarted 2026-09-05 after Electron decision) | Phase: 5 (verification + packaging) | Mode: deep
+Status: active (fresh rebuild started 2026-09-05 on user request) | Phase: verification | Mode: deep
 
 ## Active truth
-- `/goal` (rendered 2026-09-05) - outcome and gates
-- `PROBLEM_STATEMENT.md` - ISRO problem statement 26175, authoritative requirements
-- `OPEN_SOURCE_LANDSCAPE.md` - component choices and glue architecture
-- `.goal-task/depthwizard/design.md` - confirmed design decisions
+- `docs/PROBLEM_STATEMENT.md` - ISRO problem statement 26175, authoritative requirements
+- `docs/OPEN_SOURCE_LANDSCAPE.md` - inspiration only; nothing is wired in from third-party viewers
+- `.goal-task/depthwizard/design.md` - confirmed design decisions for the rebuild
 - `.goal-task/depthwizard/todo.md` - work items
 
-## Baseline (2026-09-05)
-- Repo: Depth-Wizard worktree, branch `claude/sih-problem-form-0473e6`, clean apart from docs.
-- Machine: Apple M4, 16 GB RAM, macOS. torch 2.10 with MPS, transformers 5.1, uv 0.11, node 24, pnpm 11. No GDAL CLI, no rasterio yet.
-- No existing source code. `Documents/Dineo_both` is an unrelated submodule; leave untouched.
+## Baseline
+- Worktree branch `claude/sih-problem-form-0473e6`; remote `depthwizard` = yats0x7/DepthWizard, push
+  with `git push depthwizard HEAD:main`. Commits carry no AI attribution (user rule).
+- Machine: Apple M4 16 GB, torch 2.14 MPS, transformers 5.16, uv 0.11, node 24, pnpm 11.
+- Old code (backend/, frontend/, desktop/, docker/) deleted; docs moved to docs/; data in data/.
+- Dev servers: `.claude/launch.json` engine (8000) and studio (5174). The embedded preview browser
+  runs WebGL in software (1-5 fps) so visual checks of the 3D scene use the Electron screenshot mode.
 
 ## Execution contract
 - Retry an item at most 3 times, then record and defer; continue independent work.
-- Progress line after each productive loop: gates-based percentage.
-- Independent review: 3 read-only reviewers at the final milestone (correctness/tests, design/boundaries, security/maintainability).
-- Commit locally after each milestone passes its checks. No push without authorization.
-- Model weights are downloaded from Hugging Face on first run; keep weights out of git.
+- Independent review: 3 read-only reviewers at the final milestone.
+- Commit after each milestone passes its checks; push to the private remote when a milestone is done.
 
 ## Gates
-1. Backend pipeline: PNG/JPG -> rDSM, GeoTIFF -> metric DSM (SRTM-calibrated), GeoTIFF + GLB + PNG outputs. Unit tests pass.
-2. API: FastAPI upload -> job -> results, validation endpoint with RMSE/MAE/r.
-3. Frontend: upload, 3D viewer with first-person flythrough, height probe, slope, flood, profile, validation panel. Builds with no type errors.
-4. Standalone: Docker compose for the stack plus an Electron desktop app that launches the API and opens the UI.
-5. Docs: README with setup, architecture, evaluation instructions.
-6. Independent review complete, no unresolved high-severity finding.
-
-## Decisions since start
-- Desktop wrapper is Electron, not Tauri (user decision). Remove desktop/src-tauri.
-- Real Landsat run exposed nodata halos and unbounded prior scaling; fixed in calibrate/fit.py, tests still pass.
-- Sample data: backend/data/samples/landsat_rgb.tif (flat Bahamas scene, weak demo) and oam_urban.tif (3 cm drone crop, Dar es Salaam, EPSG:32737, good demo).
-
-## Progress
-- Gate 1 backend: 14 tests pass. Gate 2 API: done. Gate 3 frontend: builds clean, browser check pending. Gate 4 packaging: Docker written, Electron pending. Gate 5 README: written. Gate 6 review: pending.
-- GitHub: private repo yats0x7/DepthWizard, branch main. Commits carry no AI attribution (user rule).
+1. Engine: PNG/JPG -> rDSM, GeoTIFF -> metric DSM, outputs, tests green. DONE.
+2. API: jobs, SSE progress, validate, recalibrate, samples. DONE.
+3. Studio: upload, Presentation/Analysis toggle, fly/walk, probe, profile, flood, GCPs,
+   validation, exports; typechecks and builds. Built; browser verification in progress.
+4. Desktop + Docker. Written; Electron smoke test in progress.
+5. README + pitch deck brief. DONE.
+6. Independent review. Pending.
 
 ## Next action
-Replace desktop/ with the Electron app, run the urban sample, drive the web app in the browser and fix issues, commit, then 3 independent reviews.
+Confirm the Electron screenshot of the urban job in Presentation mode, fix lighting/sky issues,
+exercise the analysis tools, commit and push, then run the three reviews.

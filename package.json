@@ -1,0 +1,22 @@
+{
+  "name": "depthwizard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Single-image satellite height estimation and 3D flythrough",
+  "author": "Yatharth",
+  "license": "MIT",
+  "packageManager": "pnpm@11.25.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "engine": "uv run --directory engine depthwizard serve --host 127.0.0.1 --port 8000",
+    "engine:test": "uv run --directory engine pytest -q",
+    "studio": "pnpm --filter @depthwizard/studio dev",
+    "studio:build": "pnpm --filter @depthwizard/studio build",
+    "desktop": "pnpm --filter @depthwizard/desktop start",
+    "desktop:dist": "pnpm studio:build && pnpm --filter @depthwizard/desktop dist",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint && uv run --directory engine ruff check .",
+    "test": "pnpm engine:test"
+  }
+}

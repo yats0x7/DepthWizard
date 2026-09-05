@@ -1,115 +1,119 @@
 # DepthWizard
 
-**Single-view height estimation and 3D flythrough** for Smart India Hackathon 2026, problem statement **26175** (ISRO, Department of Space).
+Single-view satellite and aerial imagery to a digital surface model, and from there to a 3D
+scene you can fly through, measure and validate. Built for Smart India Hackathon 2026, problem
+statement 26175 (Indian Space Research Organisation).
 
-Upload one optical satellite image. DepthWizard turns it into a Digital Surface Model and an interactive 3D scene you can fly through, probe, slice and validate.
+- **PNG / JPG** in, **relative DSM** out (rDSM, values 0 to 1). Ground control points turn it metric.
+- **GeoTIFF** in, **metric DSM** out: the footprint pulls a coarse global DEM (AWS Terrain Tiles by
+  default, Copernicus GLO-30 / SRTM / NASADEM optional), a robust ground-trend fit sets the scale,
+  the depth model adds the structure, GCPs refine it.
+- Outputs: Float32 GeoTIFF, 16-bit heightmap PNG, hillshaded preview, textured GLB, metadata JSON,
+  validation metrics (RMSE, MAE, bias, NMAD, Pearson r, within 1 m / 3 m) and a signed error map.
+- Studio: Presentation mode (sky, sun shadows, ambient occlusion, bloom, tone mapping, damped
+  fly-through with head-bob in walk mode) and Analysis mode (flat light, exact heights, wireframe,
+  contours, slope, aspect, flood level, cross-sections, GCPs, validation). One toggle, same geometry.
+- Ships as an Electron desktop app, a Docker image, and a plain web app.
 
-- **PNG / JPG** (no spatial metadata) → relative DSM (rDSM), normalised 0..1, optionally made metric with a couple of ground control points.
-- **GeoTIFF** (CRS + geotransform) → **metric DSM** in the image's CRS, calibrated against a global 30 m DEM (Copernicus GLO-30 by default, SRTM v3 / NASADEM optional) and written as a standard GeoTIFF.
-- Outputs: `dsm.tif`, 16-bit `heightmap.png`, hillshaded `preview.png`, textured `mesh.glb`, `meta.json`, and `metrics.json` after validation.
-
-## Architecture
+## Layout
 
 ```
-image ─► load (rasterio / PIL) ─► Depth Anything V2, tiled + globally aligned ─► relative height
-      ─► calibration ─────────────────────────────────────────────────────────► metric DSM
-            hybrid : DEM terrain trend + model structure (default)
-            affine : RANSAC a·h + b against the DEM
-            prior  : scene-level structural height prior (no DEM)
-            GCPs   : refit scale/offset on user points (any mode, any input)
-      ─► exports (GeoTIFF, PNG16, GLB via trimesh) ─► FastAPI job API ─► React + three.js viewer
+engine/        Python package `depthwizard`: pipeline, calibration, exports, FastAPI, CLI (uv)
+apps/studio/   React 19 + three.js studio (Vite, Tailwind 4, react-three-fiber)
+apps/desktop/  Electron shell that starts the engine and opens the studio
+docker/        Engine + studio image; docker-compose.yml at the root
+docs/          Problem statement, form answers, open-source landscape, pitch-deck brief
+data/          (git-ignored) samples/, jobs/, dem_cache/
 ```
 
-| Layer | Choice | Why |
-|---|---|---|
-| Depth backbone | `depth-anything/Depth-Anything-V2-Small-hf` (swap to Base/Large with `DW_MODEL_ID`, or load fine-tuned weights with `DW_FINETUNED`) | Strongest open relative-depth foundation model; Apache-2.0 |
-| Tiling | Global low-res pass + per-tile affine alignment + cosine blending | Removes per-tile scale/shift seams on large scenes |
-| DEM | `dem-stitcher` (Copernicus GLO-30, no login) | Pure Python, global coverage |
-| Calibration | `scikit-learn` RANSAC + scene prior fallback + GCPs | Robust when terrain is flat and the DEM carries no relief signal |
-| Viewer | React 19, react-three-fiber, custom GLSL terrain shader, `@mapbox/martini` RTIN LOD, `geotiff.js` | 60 fps on large DSMs, reads the GeoTIFF directly in the browser |
-| Validation | RMSE, MAE, bias, NMAD, Pearson r, within-1 m/3 m, raw and scale-aligned, error map | Matches the evaluation criteria |
+## Run it
 
-## Quick start
-
-Requirements: Python 3.12/3.13 with [uv](https://docs.astral.sh/uv/), Node 20+ with pnpm. GPU optional (CUDA, Apple MPS or CPU are picked automatically).
+Prerequisites: [uv](https://docs.astral.sh/uv/), Node 22+, pnpm 11 (`corepack enable`).
 
 ```bash
-# backend API on :8000 (first run downloads ~100 MB of model weights from Hugging Face)
-cd backend
-uv sync --extra dev
-uv run depthwizard serve --reload
-
-# frontend on :5173 (proxies /api to the backend)
-cd ../frontend
-pnpm install
-pnpm dev
+pnpm install                       # studio + desktop dependencies
+uv sync --directory engine --extra dev
+pnpm engine                        # API on http://127.0.0.1:8000 (model downloads on first run)
+pnpm studio                        # UI on http://127.0.0.1:5174 (proxies /api to the engine)
 ```
 
-Open http://localhost:5173, drop an image, wait for the job, then explore.
-
-### CLI
+Desktop app (starts its own engine, serves the built studio):
 
 ```bash
-cd backend
-uv run depthwizard run path/to/scene.tif --out data/out/scene            # GeoTIFF -> metric DSM
-uv run depthwizard run photo.png --out data/out/photo --gcp gcps.csv     # PNG + GCPs (row,col,z)
-uv run depthwizard validate data/out/scene reference_lidar_dsm.tif      # RMSE / MAE / r
-uv run depthwizard recalibrate data/out/scene --calibration affine       # no model re-run
-uv run pytest                                                           # 14 tests, no model download
+pnpm studio:build && pnpm desktop
 ```
 
-macOS note: if Python reports `CERTIFICATE_VERIFY_FAILED`, export `SSL_CERT_FILE=$(uv run python -c "import certifi;print(certifi.where())")` before running.
+Docker:
 
-### Viewer tools
+```bash
+docker compose up --build          # http://localhost:8000
+```
 
-- **Orbit / Fly** (`F`): first-person flythrough with `W A S D`, `Q`/`E` down/up, `Shift` sprint, mouse look.
-- **Layers**: image drape, hypsometric tint, slope, aspect, wireframe, contour lines, movable sun, vertical exaggeration, mesh detail.
-- **Probe** (`1`): hover readout of height, slope, pixel and map coordinates; click to pin.
-- **Profile** (`2`): two clicks draw a cross-section chart.
-- **GCP** (`3`): click a point, type its known height, apply to recalibrate live.
-- **Flood**: water-level slider tints inundated terrain (Disaster Management use case).
-- **Validate**: upload a reference DSM / LiDAR GeoTIFF for metrics and an error map.
-- **Info / Downloads**: calibration report, statistics, all output files.
+Command line:
+
+```bash
+uv run --directory engine depthwizard run data/samples/oam_urban.tif --out data/out/urban
+uv run --directory engine depthwizard validate data/out/urban reference.tif
+uv run --directory engine depthwizard recalibrate data/out/urban --gcps gcps.json
+```
+
+Drop sample scenes into `data/samples/` and they appear in the studio under "Sample scenes".
+
+## How it works
+
+1. **Read** PNG/JPG (Pillow) or GeoTIFF (rasterio). Large inputs are downscaled to 6000 px; the
+   georeferencing transform is scaled with them.
+2. **Predict** relative depth with Depth Anything V2 (Small by default; Base and Large selectable
+   per job) through Hugging Face transformers. Scenes larger than one tile are processed as
+   overlapping tiles, each aligned to one global low-resolution pass with a trimmed least-squares
+   affine fit and blended with a raised-cosine window. A horizontally flipped pass is averaged in.
+3. **Calibrate.** The relative height map is split into a ground trend (asymmetric Gaussian
+   smoothing that ignores objects above ground) and structure (everything above it). For
+   georeferenced input the trend is fitted to the coarse DEM with RANSAC; the DSM is the filled DEM
+   plus the scaled structure (`hybrid`). `affine` fits the whole map directly, `prior` uses a scene
+   height prior when no DEM is available. Ground control points refit offset (1 point) or scale and
+   offset (2+) on any result, including PNG inputs.
+4. **Export** GeoTIFF (nodata −9999, deflate), 16-bit PNG, hillshaded preview, texture, GLB mesh
+   (X east, Y up, Z south, metres), surface statistics and timings in `meta.json`.
+5. **View.** The studio reads the GeoTIFF in the browser (geotiff.js), builds a regular grid whose
+   vertices are exact DSM samples, drapes the image, and renders it with a stock three.js material
+   extended by a fragment-shader layer system (hypsometric, slope, aspect, hillshade, contours,
+   flood tint) computed from a full-resolution float height texture. Every readout samples the
+   DSM array bilinearly; the mesh is never the source of a number.
 
 ## Configuration
 
-Every setting is an environment variable with the `DW_` prefix (see `backend/depthwizard/config.py`):
+Every setting is a `DW_*` environment variable (see `engine/depthwizard/config.py`): `DW_MODEL`
+(small | base | large | any HF depth model id), `DW_DEVICE`, `DW_DEM_SOURCE`, `DW_CALIBRATION`,
+`DW_PRIOR_P95_HEIGHT_M`, `DW_TTA`, `DW_MESH_MAX_SIDE`, `DW_DATA_DIR`, `DW_FINETUNED` (a state_dict
+fine-tuned on aerial DSM data), `DW_HF_TOKEN`.
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `DW_MODEL_ID` | `depth-anything/Depth-Anything-V2-Small-hf` | Any HF depth-estimation model |
-| `DW_FINETUNED` | unset | Path to a state dict fine-tuned on aerial nDSMs (e.g. GAMUS) |
-| `DW_DEVICE` | `auto` | `cuda`, `mps`, `cpu` |
-| `DW_INFER_RES` / `DW_TILE` / `DW_OVERLAP` | 1036 / 1036 / 160 | Inference resolution and tiling |
-| `DW_DEM_SOURCE` | `glo_30` | `glo_30`, `srtm_v3`, `nasadem` |
-| `DW_CALIBRATION` | `hybrid` | `hybrid`, `affine`, `prior` |
-| `DW_PRIOR_P95_HEIGHT_M` | 20 | Scene prior for structural heights |
-| `DW_DATA_DIR` | `data` | Jobs and outputs |
-| `DW_STATIC_DIR` | `../frontend/dist` | Built web app served by the API |
+## API
 
-## Packaging
+`GET /api/system`, `GET /api/samples`, `POST /api/jobs` (multipart: file, model, calibration,
+dem_source, prior_p95_m, gcps), `POST /api/jobs/from-sample`, `GET /api/jobs`, `GET /api/jobs/{id}`,
+`GET /api/jobs/{id}/events` (server-sent progress), `POST /api/jobs/{id}/cancel`,
+`DELETE /api/jobs/{id}`, `GET /api/jobs/{id}/files/{name}`, `POST /api/jobs/{id}/validate`
+(multipart reference raster), `POST /api/jobs/{id}/recalibrate` (JSON: mode, gcps, prior_p95_m).
+Interactive docs at `/docs`.
 
-- **Docker**: `docker/build.sh` builds the web bundle and an API image that serves it on port 8000, then `docker compose up`.
-- **Desktop**: `desktop/` holds a Tauri 2 configuration that wraps the web app and launches the API as a sidecar; see `desktop/README.md`.
+## Tests
+
+```bash
+pnpm test            # engine: pytest (tiling, calibration, pipeline, API, SSE)
+pnpm typecheck       # studio + desktop
+pnpm lint            # tsc + ruff
+```
 
 ## Evaluation
 
-`depthwizard validate <job_dir> <reference.tif>` reprojects the reference onto the prediction grid and reports raw and scale-aligned RMSE, MAE, bias, NMAD, Pearson r and the share of pixels within 1 m and 3 m, plus an error map. The same runs from the **Validate** tab in the app. Per-landscape breakdowns are supported through class masks in `depthwizard.eval.compare`.
+Run a scene, then validate against a reference raster (LiDAR DSM, photogrammetric DSM, or the
+reference set from the problem statement). `metrics.json` reports raw and scale/offset-aligned
+metrics; `error_map.png` shows signed error. Per-landscape metrics come from passing class masks to
+`depthwizard.eval.metrics.compare`.
 
-## Fine-tuning on GAMUS (recommended follow-up)
+## Packaging notes
 
-The problem statement recommends the GAMUS dataset. Fine-tune the Depth Anything V2 decoder on GAMUS nDSM labels following the `depth-any-canopy` recipe, save the state dict, and point `DW_FINETUNED` at it. Everything else stays the same.
-
-## Repository layout
-
-```
-backend/     Python package `depthwizard` (pipeline, API, CLI, tests)
-frontend/    Vite + React + three.js web app
-desktop/     Tauri 2 desktop wrapper
-docker/      Dockerfiles and build script
-PROBLEM_STATEMENT.md, OPEN_SOURCE_LANDSCAPE.md, SIH_FORM_ANSWERS.md
-```
-
-## License
-
-MIT for this repository. Third-party components keep their own licenses (Depth Anything V2 Apache-2.0, three.js MIT, etc.).
+The Electron app runs the engine through `uv` on the developer machine. For a self-contained
+installer, freeze the engine (PyInstaller: `depthwizard.cli:app`) into `engine/build/depthwizard`
+and run `pnpm desktop:dist`; electron-builder copies it next to the app resources.

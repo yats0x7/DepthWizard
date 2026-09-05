@@ -1,6 +1,5 @@
 # python
-backend/.venv/
-backend/data/
+.venv/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -9,15 +8,19 @@ __pycache__/
 *.egg-info/
 # node
 node_modules/
-frontend/dist/
-desktop/src-tauri/target/
-# models / outputs
+dist/
+out/
+release/
+*.tsbuildinfo
+# data, weights, outputs (never committed)
+data/
 *.pth
 *.safetensors
 *.glb
 *.tif
 *.tiff
-!backend/tests/fixtures/*.tif
+!engine/tests/fixtures/*.tif
 # misc
 .DS_Store
 .env
+*.log
