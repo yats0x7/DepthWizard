@@ -9,6 +9,7 @@ export function Landing() {
   const loading = useStore((s) => s.loading)
   const error = useStore((s) => s.error)
   const openJob = useStore((s) => s.openJob)
+  const set = useStore((s) => s.set)
 
   if (job && (job.status === 'queued' || job.status === 'running')) {
     return (
@@ -49,6 +50,7 @@ export function Landing() {
         </div>
         <Dropzone />
         <Samples />
+        <Button onClick={() => set('panel', 'map')} className="self-start">Open map picker</Button>
         <ol className="grid grid-cols-1 gap-6 border-t border-line pt-6 md:grid-cols-3">
           {[
             { icon: Scan, title: 'Depth from one view', body: 'Depth Anything V2 reads structure from the image; tiles are aligned to one global pass.' },

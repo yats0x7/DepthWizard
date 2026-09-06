@@ -13,6 +13,7 @@ export default function App() {
   const boot = useStore((s) => s.boot)
   const refreshJobs = useStore((s) => s.refreshJobs)
   const hf = useStore((s) => s.heightField)
+  const panel = useStore((s) => s.panel)
   const [hidePanels, setHidePanels] = useState(false)
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function App() {
           <Landing />
         )}
       </main>
-      {!hidePanels && hf && <Inspector />}
+      {!hidePanels && (hf || panel === 'map') && <Inspector />}
     </div>
   )
 }

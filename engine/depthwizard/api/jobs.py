@@ -15,7 +15,7 @@ from pathlib import Path
 from ..calibrate.fit import GCP
 from ..config import Settings
 from ..config import settings as default_settings
-from ..imagery.sources import ImageryItem, fetch_area
+from ..imagery.sources import ImageryItem, canonicalize_item, fetch_area
 from ..pipeline import JobCancelled, RunOptions, run
 
 log = logging.getLogger(__name__)
@@ -134,6 +134,7 @@ class JobManager:
         return dict(st)
 
     def submit_area(self, item: ImageryItem, bbox: tuple[float, float, float, float], options: RunOptions) -> dict:
+        item = canonicalize_item(item)
         jid = uuid.uuid4().hex[:12]
         d = self.dir(jid)
         d.mkdir(parents=True, exist_ok=True)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import queue
 import shutil
 import tempfile
@@ -19,7 +20,7 @@ from sse_starlette.sse import EventSourceResponse
 from .. import __version__
 from ..config import DEM_SOURCES, MODEL_PRESETS, Settings
 from ..config import settings as default_settings
-from ..imagery.sources import ImageryItem, validate_item
+from ..imagery.sources import ImageryItem, bbox_area_km2, canonicalize_item
 from ..imagery.sources import search as search_imagery
 from ..pipeline import OUTPUT_FILES, RunOptions, recalibrate, validate
 from .jobs import JobManager, parse_gcps
@@ -31,6 +32,8 @@ GEO_EXT = {".tif", ".tiff", ".geotiff", ".jp2", ".img"}
 REFERENCE_ALLOWED = {".tif", ".tiff", ".geotiff", ".img", ".png"}
 CALIBRATIONS = ("hybrid", "affine", "prior", "semantic")
 MAX_UPLOAD = 1024 * 1024 * 1024  # 1 GB
+MAX_IMAGERY_AREA_KM2 = 100.0
+MAX_AREA_JOBS = 2
 TERMINAL = ("done", "failed", "cancelled")
 
 
@@ -110,6 +113,16 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
             raise HTTPException(409, "job is not finished")
         return st
 
+    def validate_bbox(bbox: list[float]) -> tuple[float, float, float, float]:
+        if len(bbox) != 4 or not all(math.isfinite(v) for v in bbox):
+            raise HTTPException(422, "bbox must contain four finite coordinates")
+        west, south, east, north = bbox
+        if not (-180 <= west < east <= 180 and -90 <= south < north <= 90):
+            raise HTTPException(422, "bbox coordinates must be within EPSG:4326 bounds")
+        if bbox_area_km2((west, south, east, north)) > MAX_IMAGERY_AREA_KM2:
+            raise HTTPException(413, f"imagery box is limited to {MAX_IMAGERY_AREA_KM2:g} km²")
+        return west, south, east, north
+
     @app.get("/api/health")
     def health() -> dict:
         return {"ok": True, "version": __version__}
@@ -184,13 +197,12 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
 
     @app.post("/api/imagery/search")
     def imagery_search(req: ImagerySearchRequest) -> list[dict]:
-        if len(req.bbox) != 4 or req.bbox[0] >= req.bbox[2] or req.bbox[1] >= req.bbox[3]:
-            raise HTTPException(422, "bbox must be [west, south, east, north] with positive area")
+        bbox = validate_bbox(req.bbox)
         try:
             return [
                 item.to_dict()
                 for item in search_imagery(
-                    tuple(req.bbox), tuple(req.sources), req.months, req.max_cloud, req.limit
+                    bbox, tuple(req.sources), req.months, req.max_cloud, req.limit
                 )
             ]
         except Exception as exc:  # noqa: BLE001
@@ -198,15 +210,16 @@ def create_app(cfg: Settings = default_settings) -> FastAPI:
 
     @app.post("/api/jobs/from-area", status_code=202)
     def create_from_area(req: AreaJobRequest) -> dict:
-        if len(req.bbox) != 4 or req.bbox[0] >= req.bbox[2] or req.bbox[1] >= req.bbox[3]:
-            raise HTTPException(422, "bbox must be [west, south, east, north] with positive area")
+        bbox = validate_bbox(req.bbox)
+        if sum(1 for job in jobs.list() if job.get("imagery") and job["status"] in ("queued", "running")) >= MAX_AREA_JOBS:
+            raise HTTPException(429, "too many imagery jobs are running; wait for one to finish")
         try:
             item = ImageryItem(**req.item.model_dump())
-            validate_item(item)
+            item = canonicalize_item(item)
         except (TypeError, ValueError) as exc:
             raise HTTPException(422, f"invalid imagery item: {exc}") from exc
         opts = parse_options(req.model, req.calibration, req.dem_source, req.prior_p95_m, req.semantic_prior)
-        return jobs.submit_area(item, tuple(req.bbox), opts)
+        return jobs.submit_area(item, bbox, opts)
 
     @app.post("/api/jobs/from-sample", status_code=202)
     def create_from_sample(req: SampleRequest) -> dict:

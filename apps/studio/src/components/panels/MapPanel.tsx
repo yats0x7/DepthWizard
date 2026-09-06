@@ -28,6 +28,7 @@ export function MapPanel() {
   const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER)
   const [sizeKm, setSizeKm] = useState(3)
   const [query, setQuery] = useState('')
+  const [coordinates, setCoordinates] = useState('')
   const [places, setPlaces] = useState<{ name: string; center: [number, number] }[]>([])
   const [items, setItems] = useState<ImageryItem[]>([])
   const [selected, setSelected] = useState<ImageryItem | null>(null)
@@ -108,6 +109,17 @@ export function MapPanel() {
     }
   }
 
+  function goToCoordinates() {
+    const values = coordinates.split(',').map((value) => Number(value.trim()))
+    if (values.length !== 2 || !values.every(Number.isFinite) || values[0] < -180 || values[0] > 180 || values[1] < -90 || values[1] > 90) {
+      setErr('Coordinates must be longitude, latitude within EPSG:4326')
+      return
+    }
+    setErr(null)
+    setPlaces([])
+    setCenter([values[0], values[1]])
+  }
+
   async function findImagery() {
     setBusy(true)
     setErr(null)
@@ -143,6 +155,10 @@ export function MapPanel() {
       <div className="flex gap-2">
         <Input value={query} placeholder="Search a place with Photon" onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && findPlace()} />
         <Button size="sm" aria-label="Search place" onClick={findPlace}><Search size={14} /></Button>
+      </div>
+      <div className="flex gap-2">
+        <Input value={coordinates} placeholder="longitude, latitude" onChange={(e) => setCoordinates(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && goToCoordinates()} />
+        <Button size="sm" aria-label="Go to coordinates" onClick={goToCoordinates}><MapPin size={14} /></Button>
       </div>
       {places.length > 0 && <div className="flex flex-col gap-1 rounded-lg border border-line-2 bg-panel-2 p-1">
         {places.map((place) => <button key={`${place.name}-${place.center.join(',')}`} className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] text-ink-2 hover:bg-raised" onClick={() => { setCenter(place.center); setPlaces([]) }}><MapPin size={13} className="text-accent" />{place.name || 'Unnamed place'}</button>)}

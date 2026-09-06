@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import asdict, dataclass
+import re
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
@@ -43,6 +44,7 @@ SOURCE_HOSTS = {
     "oam": {"oin-hotosm-temp.s3.amazonaws.com", "oin-hotosm.s3.amazonaws.com"},
     "sentinel2": {"sentinel-cogs.s3.us-west-2.amazonaws.com"},
 }
+OAM_REGIONAL_HOST = re.compile(r"^oin-hotosm(?:-temp)?\.s3\.[a-z0-9-]+\.amazonaws\.com$")
 
 BBox = tuple[float, float, float, float]  # west, south, east, north (EPSG:4326)
 
@@ -61,6 +63,7 @@ class ImageryItem:
     provider: str | None = None
     license: str = ""
     attribution: str = ""
+    coverage: float | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -72,8 +75,33 @@ def validate_item(item: ImageryItem) -> None:
     parsed = urlparse(item.url)
     if hosts is None:
         raise ValueError(f"unsupported imagery source: {item.source}")
-    if parsed.scheme != "https" or parsed.hostname not in hosts:
+    host_ok = parsed.hostname in hosts or (
+        item.source == "oam" and parsed.hostname and OAM_REGIONAL_HOST.fullmatch(parsed.hostname)
+    )
+    if parsed.scheme != "https" or parsed.port is not None or parsed.username or parsed.password or not host_ok:
         raise ValueError(f"{item.source} imagery URL must be HTTPS on an approved source host")
+
+
+def canonicalize_item(item: ImageryItem) -> ImageryItem:
+    """Return server-owned provenance for a validated source URL."""
+    validate_item(item)
+    if not item.id.strip():
+        raise ValueError("imagery item id is required")
+    if item.source == "oam":
+        return replace(
+            item,
+            title=f"OpenAerialMap item {item.id}",
+            provider="OpenAerialMap",
+            license=SOURCES["oam"]["license"],
+            attribution="OpenAerialMap contributors, CC-BY 4.0",
+        )
+    return replace(
+        item,
+        title=f"Sentinel-2 L2A item {item.id}",
+        provider="ESA / Copernicus via Earth Search",
+        license=SOURCES["sentinel2"]["license"],
+        attribution="Contains modified Copernicus Sentinel data",
+    )
 
 
 def bbox_around(lon: float, lat: float, size_km: float) -> BBox:
@@ -203,8 +231,8 @@ def search(
             except Exception as exc:  # noqa: BLE001
                 log.warning("Sentinel-2 search failed: %s", exc)
     for it in out:
-        it.__dict__["coverage"] = round(_overlap(bbox, it.bbox), 3)
-    out.sort(key=lambda i: (i.gsd_m or 1e9, -(i.__dict__.get("coverage", 0)), i.cloud or 0))
+        it.coverage = round(_overlap(bbox, it.bbox), 3)
+    out.sort(key=lambda i: (i.gsd_m or 1e9, -(i.coverage or 0), i.cloud or 0))
     return out
 
 
@@ -217,8 +245,18 @@ def fetch_area(
         GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR",
         CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif,.tiff,.TIF",
         GDAL_HTTP_MULTIRANGE="YES",
+        GDAL_HTTP_TIMEOUT="30",
+        GDAL_HTTP_MAX_RETRY="2",
+        GDAL_HTTP_RETRY_DELAY="1",
     )
+    validate_item(item)
     with env, rasterio.open(item.url) as ds:
+        if ds.crs is None:
+            raise ValueError("selected imagery has no CRS and cannot be fetched as a map area")
+        source_bbox = transform_bounds(ds.crs, "EPSG:4326", *ds.bounds, densify_pts=21)
+        coverage = _overlap(bbox, source_bbox)
+        if coverage < 0.995:
+            raise ValueError("the image does not fully cover the requested box; pick another image or a smaller box")
         wb = transform_bounds("EPSG:4326", ds.crs, *bbox, densify_pts=21)
         win = from_bounds(*wb, transform=ds.transform)
         full = Window(0, 0, ds.width, ds.height)
@@ -288,6 +326,7 @@ def fetch_area(
         "attribution": item.attribution,
         "url": item.url,
         "bbox": list(bbox),
+        "coverage": round(coverage, 3),
         "gsd_m": round(native * f, 3),
         "native_gsd_m": round(native, 3),
         "shape": [out_h, out_w],

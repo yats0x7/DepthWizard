@@ -94,7 +94,7 @@ def test_imagery_search_and_area_job_are_network_independent(client, geotiff_pat
 
     r = client.post(
         "/api/imagery/search",
-        json={"bbox": [77.5, 12.9, 77.6, 13.0], "sources": ["sentinel2"]},
+        json={"bbox": [77.5, 12.9, 77.51, 12.91], "sources": ["sentinel2"]},
     )
     assert r.status_code == 200 and r.json()[0]["id"] == "test-scene"
 
@@ -107,21 +107,50 @@ def test_imagery_search_and_area_job_are_network_independent(client, geotiff_pat
     monkeypatch.setattr(jobs_module, "fetch_area", fake_fetch)
     r = client.post(
         "/api/jobs/from-area",
-        json={"bbox": [77.5, 12.9, 77.6, 13.0], "item": item.to_dict()},
+        json={"bbox": [77.5, 12.9, 77.51, 12.91], "item": item.to_dict()},
     )
     assert r.status_code == 202
     st = _wait(client, r.json()["id"])
     assert st["status"] == "done", st
     assert st["imagery"]["source"] == "sentinel2"
-    assert st["meta"]["imagery"]["attribution"] == "test attribution"
+    assert st["meta"]["imagery"]["attribution"] == "Contains modified Copernicus Sentinel data"
+    assert st["meta"]["imagery"]["license"] == "Copernicus open"
 
     item_dict = item.to_dict()
     item_dict["url"] = "https://example.com/not-approved.tif"
     r = client.post(
         "/api/jobs/from-area",
-        json={"bbox": [77.5, 12.9, 77.6, 13.0], "item": item_dict},
+        json={"bbox": [77.5, 12.9, 77.51, 12.91], "item": item_dict},
     )
     assert r.status_code == 422
+
+
+def test_imagery_bbox_is_finite_bounded_and_area_limited(client):
+    for bbox, status in [([None, 12.9, 77.6, 13.0], 422), ([-181, 12.9, 77.6, 13.0], 422), ([0, 0, 2, 2], 413)]:
+        r = client.post("/api/imagery/search", json={"bbox": bbox, "sources": ["sentinel2"]})
+        assert r.status_code == status
+
+
+def test_regional_oam_urls_are_allowed_and_provenance_is_canonical():
+    from depthwizard.imagery.sources import ImageryItem, canonicalize_item, validate_item
+
+    item = ImageryItem(
+        source="oam",
+        id="abc",
+        title="forged title",
+        url="https://oin-hotosm-temp.s3.us-east-1.amazonaws.com/abc.tif",
+        bbox=[0, 0, 1, 1],
+        license="forged licence",
+        attribution="forged attribution",
+    )
+    validate_item(item)
+    canonical = canonicalize_item(item)
+    assert canonical.license == "CC-BY 4.0"
+    assert canonical.attribution == "OpenAerialMap contributors, CC-BY 4.0"
+
+    item.url = "https://oin-hotosm-temp.s3.us-east-1.amazonaws.com:8443/abc.tif"
+    with pytest.raises(ValueError):
+        validate_item(item)
 
 
 def test_rejects_bad_upload(client, tmp_path):

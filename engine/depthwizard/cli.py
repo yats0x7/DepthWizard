@@ -131,11 +131,14 @@ def benchmark_run_command(
     manifest: Path = typer.Option(Path("data/benchmark/manifest.json"), "--manifest"),
     out: Path = typer.Option(Path("data/benchmark"), "--out", "-o"),
     scene: str | None = typer.Option(None, "--scene", help="Run one scene id instead of the full manifest"),
+    semantic_prior: bool = typer.Option(False, "--semantic-prior", help="run the opt-in semantic calibration route"),
 ) -> None:
     """Fetch cached scene pairs, run the normal pipeline, and save benchmark results."""
     from .benchmark.runner import benchmark_run
+    from .pipeline import RunOptions
 
-    results = benchmark_run(manifest, out, settings, scene_id=scene)
+    options = RunOptions(calibration="semantic" if semantic_prior else None, semantic_prior=semantic_prior)
+    results = benchmark_run(manifest, out, settings, options=options, scene_id=scene)
     for result in results:
         m = result["metrics"]
         raw = m.get("raw", {})

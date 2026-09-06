@@ -132,6 +132,12 @@ eight-scene baseline covers two urban, two sparse, two hilly and two forested sc
 imagery, validated independently against AHN4 or USGS 3DEP height data; see `docs/BENCHMARK.md` for
 the measured raw and aligned results and provenance.
 
+To reproduce the opt-in semantic A/B, run the same manifest into a separate cache with
+`depthwizard benchmark run --manifest data/benchmark/manifest.json --out data/benchmark-semantic
+--semantic-prior`, then add `--compare-root data/benchmark-semantic` to the report command. The
+report checks that both caches contain the same scene ids, bboxes and source URLs and that the
+comparison outputs were actually calibrated with the semantic route.
+
 The baseline per-class raw/aligned RMSE is urban 7.692/6.001 m, sparse 10.497/4.471 m, hilly
 3.130/2.998 m, and forested 5.846/4.735 m. These are measured results, including the weak classes,
 not a product guarantee. The opt-in semantic flat-surface prior is benchmarked A/B in the same

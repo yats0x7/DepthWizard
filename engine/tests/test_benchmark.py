@@ -2,6 +2,7 @@ import json
 
 from depthwizard.benchmark.manifest import load_manifest
 from depthwizard.benchmark.runner import benchmark_report, benchmark_run
+from depthwizard.pipeline import RunOptions
 
 
 def test_benchmark_manifest_rejects_unknown_landscape(tmp_path):
@@ -75,3 +76,23 @@ def test_benchmark_run_is_cached_and_reports_local_scene(tmp_path, png_path, cfg
     text = report.read_text()
     assert "Per-scene results" in text and "Per-class weighted results" in text
     assert "local-urban" in text and "urban" in text
+
+
+def test_benchmark_cache_is_bound_to_options(tmp_path, png_path, cfg):
+    manifest_dir = tmp_path / "manifest"
+    manifest_dir.mkdir()
+    image = manifest_dir / "scene.png"
+    reference = manifest_dir / "reference.png"
+    image.write_bytes(png_path.read_bytes())
+    reference.write_bytes(png_path.read_bytes())
+    manifest = manifest_dir / "manifest.json"
+    manifest.write_text(json.dumps({"version": 1, "scenes": [{
+        "id": "cached-urban", "landscape": "urban", "bbox": [0, 0, 0.01, 0.01],
+        "imagery": {"kind": "local", "source": "image", "path": "scene.png"},
+        "reference": {"kind": "local", "source": "reference", "path": "reference.png"},
+    }]}))
+    root = tmp_path / "benchmark"
+    baseline = benchmark_run(manifest, root, cfg)[0]
+    semantic = benchmark_run(manifest, root, cfg, options=RunOptions(semantic_prior=True))[0]
+    assert baseline["options"]["semantic_prior"] is False
+    assert semantic["options"]["semantic_prior"] is True
