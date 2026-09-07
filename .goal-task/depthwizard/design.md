@@ -53,3 +53,41 @@
 - Output GeoTIFF Float32, nodata −9999, CRS/transform copied from input; relative DSM for
   ungeoreferenced input written as `rdsm.tif` plus 16-bit PNG.
 - Never commit weights, job data, samples, node_modules or dist.
+
+## Phase 2 decisions (2026-09-06)
+
+### Imagery sources: what we may process
+Only sources whose licence permits downloading and deriving products are used as pixels:
+Sentinel-2 L2A through Earth Search (open, attribute "Contains modified Copernicus Sentinel data"),
+OpenAerialMap (CC-BY 4.0, attribute the provider), and optionally ISRO Bhoonidhi open collections.
+Google Maps and Earth tiles, Esri World Imagery and Mapbox Satellite are excluded: their terms bar
+storing tiles, image analysis and derived 3D models, which is exactly what this product does. Any of
+them may still appear as a display-only basemap. Attribution travels with the job into `meta.json`
+and the job card.
+
+### Fetch shape
+Search returns candidates ranked sharpest first with coverage of the requested box; fetch reads only
+the requested window from the remote cloud-optimised GeoTIFF rather than whole scenes, and writes a
+local GeoTIFF in the source CRS. The existing pipeline is unchanged: a fetched area is an ordinary
+georeferenced input.
+
+### Benchmark: real reference only
+Accuracy claims use independent height data, never the DEM the calibration itself consumed, because
+that would be circular. Primary references are AHN (Netherlands, open LiDAR DSM) and USGS 3DEP
+(United States LiDAR), each paired with high-resolution open imagery of the same footprint. Indian
+scenes are included for relevance and are reported with whatever reference is genuinely available,
+labelled as such. Every scene records its landscape class so the per-class table the evaluation
+criteria ask for falls out of the existing `compare(..., classes=...)` path. Benchmark inputs stay
+out of git; the manifest, results table and error maps are committed.
+
+### Semantic priors
+Added as a fourth calibration route beside hybrid, affine and prior, matching the wording of the
+problem statement's scale-calibration milestone. Flat classes such as water and road surfaces are
+pinned to a local ground plane so the structural scale is fitted against genuine relief rather than
+texture noise. It is opt-in, never the default, and its measured effect on the benchmark is recorded
+whether it helps or not.
+
+### Additive-only invariant
+Phase 1 behaviour, output file names, API response shapes and viewer semantics do not change. The
+Phase 1 test suite passing unchanged is the regression proof; new behaviour arrives behind new
+endpoints, new options defaulting to today's behaviour, and new UI surfaces.

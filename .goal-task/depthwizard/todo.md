@@ -1,29 +1,56 @@
-# DepthWizard TODO (rebuild)
+# DepthWizard TODO
 
-## Engine
-- [x] package, config (presets, DEM sources), raster I/O, tiling, backbone (TTA, fp16)
-- [x] calibration with robust ground trend, DEM cache + terrarium, GLB, analysis, metrics
-- [x] pipeline with progress/cancel, JobManager with SSE, API (jobs, samples, from-path,
-      validate, recalibrate, files), CLI
-- [x] 19 tests green, ruff clean; real run on oam_urban.tif (metric DSM 21-49 m, 35 s on MPS)
+## Phase 1 - shipped
+- [x] engine: raster IO, tiled inference, calibration, DEM cache, GLB, analysis, metrics, pipeline
+- [x] api: jobs, SSE progress, samples, validate, recalibrate, files; CLI incl. prefetch
+- [x] studio: Presentation/Analysis modes, cameras, layers, tools, panels, HUD
+- [x] desktop Electron app, Docker image, README, pitch-deck brief
+- [x] 3 independent reviews and fixes; 33 tests green; pushed to main
 
-## Studio
-- [x] theme, API client, terrain math, store, UI primitives, HUD, panels, landing, jobs
-- [x] viewer: terrain material layers, proxy picking, camera rig, atmosphere, effects
-- [x] verify Presentation lighting/sky on a real GPU (Electron screenshot, own sky dome shader)
-- [x] verify walk, probe, profile, flood, GCP recalibrate, validation, PNG path end to end
-- [x] design pass at desktop + narrow widths (Impeccable craft floor)
+## Phase 2 - accuracy evidence (gate 1)
+- [x] `data/benchmark/manifest.json`: scene id, bbox, imagery source + URL, reference source + URL,
+      landscape class, licence, expected GSD
+- [x] `engine/depthwizard/benchmark/` : fetch imagery + reference pair, run pipeline, validate,
+      collect one row per scene; resumable, cached, never re-downloads
+- [x] reference adapters: AHN WCS (Netherlands, 0.5 m LiDAR DSM), USGS 3DEP ImageServer (US LiDAR),
+      plain local GeoTIFF for anything downloaded by hand
+- [x] matching imagery: PDOK 8 cm aerial for AHN scenes, NAIP for 3DEP scenes, OpenAerialMap and
+      Sentinel-2 elsewhere
+- [x] at least 2 scenes per class: urban, sparse, hilly, forested
+- [x] `depthwizard benchmark run` and `depthwizard benchmark report` commands
+- [x] `docs/BENCHMARK.md`: per-scene and per-class table, method, licences, error maps, honest
+      commentary on where it fails
+- [x] feed the real numbers into `docs/PITCH_DECK.md` slide 7 and the README
 
-## Desktop / packaging
-- [x] Electron main + preload, screenshot mode, builder config
-- [x] Electron smoke test (dev URL + built studio, 60 fps on Apple GPU)
-- [x] Dockerfile + compose, README
+## Phase 2 - semantic priors (gate 2)
+- [x] segmentation of flat surfaces (water, roads, bare ground) from the RGB, no new heavy model
+      unless a small one is justified; record the choice in design.md
+- [x] constraint in `calibrate/fit.py` as a fourth route: flat classes pinned to a local ground
+      plane, buildings kept above it; off by default, opt-in per job
+- [x] unit tests on synthetic scenes; A/B on the benchmark, result recorded either way
+- [x] expose as a run option in API, CLI and the studio run-options form
 
-## Docs / process
-- [x] docs/PITCH_DECK.md
-- [x] commit milestone, push to yats0x7/DepthWizard main
-- [x] 3 independent reviews (correctness, design, security) and fixes: aspect convention, hillshade
-      azimuth, RGB+NIR alpha, sea-level clamp, job delete/switch races, SSE end, traversal, CORS,
-      desktop token for local paths, Electron sandbox/navigation guard, class-mask validation,
-      legend, prior datum labelling, picking refinement, offline model message + prefetch
-- [ ] final commit + push
+## Phase 2 - map-pick imagery (gate 3)
+- [x] `engine/depthwizard/imagery/sources.py`: OpenAerialMap + Sentinel-2 search, windowed fetch
+      to a georeferenced GeoTIFF, attribution captured
+- [x] `POST /api/imagery/search` and `POST /api/jobs/from-area`, with a fetch stage in the pipeline
+- [x] offline tests with recorded responses; no network in the test suite
+- [x] studio Map tab: MapLibre + OpenFreeMap basemap, Photon place search, pasted coordinates,
+      draggable box with area and expected-GSD readout, source list with thumbnails and dates
+- [x] attribution and licence shown on the job card and in `meta.json`
+- [ ] optional: ISRO Bhoonidhi source behind a user login, if the API proves workable
+
+## Phase 2 - close out (gates 4, 5)
+- [x] engine tests green (42) at the time of this commit
+- [x] full regression: engine tests, typecheck, lint, three sample scenes re-run and compared
+- [x] 3 independent reviewers, fix findings
+- [x] README + pitch deck updated, local implementation commits made
+
+## Phase 3 - judging edge (from SIH differentiation advice)
+- [ ] `docs/PITCH_DECK.md`: add a "What Makes This Different?" slide in the form
+      existing solution -> specific limitation -> our approach, sourced from
+      `docs/OPEN_SOURCE_LANDSCAPE.md` section 8 (rival SIH repos) and section 10 (uncovered gaps)
+- [ ] cite external sources for the cost and lead-time claim behind stereo, LiDAR and InSAR, so the
+      problem framing rests on published figures rather than assertion
+- [ ] raise benchmark resolution: add scenes with sub-metre imagery so the accuracy table is not
+      bounded by Sentinel-2's 10 m pixels
