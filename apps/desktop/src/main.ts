@@ -164,6 +164,20 @@ async function createWindow(): Promise<void> {
           const img = await win!.webContents.capturePage()
           writeFileSync(file, img.toPNG())
           res.writeHead(200).end(file)
+        } else if (url.pathname === '/click') {
+          // Real OS-level input, which synthetic DOM events cannot replace: the 3D viewer's
+          // raycaster only runs for pointer events the renderer itself dispatched.
+          const x = Number(url.searchParams.get('x'))
+          const y = Number(url.searchParams.get('y'))
+          const wc = win!.webContents
+          wc.sendInputEvent({ type: 'mouseMove', x, y })
+          setTimeout(() => {
+            wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 })
+            setTimeout(() => {
+              wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 })
+              res.writeHead(200).end(`clicked ${x},${y}`)
+            }, 60)
+          }, 120)
         } else if (url.pathname === '/eval' && req.method === 'POST') {
           let body = ''
           req.on('data', (c) => (body += c))

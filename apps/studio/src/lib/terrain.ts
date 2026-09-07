@@ -8,6 +8,14 @@ import * as THREE from 'three'
 import { fromUrl } from 'geotiff'
 import type { Meta } from './api'
 
+/**
+ * Upper bound on samples held in the browser. A 10980-square Sentinel tile is 120M samples; at
+ * four bytes each, plus the copy the height texture used to make, that reached the V8 heap limit
+ * and killed the renderer. Reading such a scene decimated keeps it open. Exports, validation and
+ * every number the engine reports still come from the full-resolution model on disk.
+ */
+export const MAX_FIELD_SAMPLES = 24_000_000
+
 export interface HeightField {
   data: Float32Array // row-major, NaN where nodata
   width: number
@@ -21,15 +29,25 @@ export interface HeightField {
   /** Optional pixel -> map transform (affine a,b,c,d,e,f) when georeferenced. */
   transform: number[] | null
   epsg: number | null
+  /** >1 when the scene was too large to hold at full resolution; the viewer reads every Nth pixel. */
+  sampledEvery: number
 }
 
 export async function loadHeightField(url: string, meta: Meta): Promise<HeightField> {
   const tiff = await fromUrl(url, { allowFullFile: true })
   const image = await tiff.getImage()
-  const width = image.getWidth()
-  const height = image.getHeight()
+  const fullWidth = image.getWidth()
+  const fullHeight = image.getHeight()
   const nodata = image.getGDALNoData()
-  const raster = (await image.readRasters({ interleave: true })) as unknown as ArrayLike<number>
+  // Decimate only when the full grid would not fit in memory, and by whole pixels so every
+  // remaining sample is still an untouched measurement rather than an average of several.
+  const sampledEvery = Math.max(1, Math.ceil(Math.sqrt((fullWidth * fullHeight) / MAX_FIELD_SAMPLES)))
+  const width = Math.ceil(fullWidth / sampledEvery)
+  const height = Math.ceil(fullHeight / sampledEvery)
+  const raster = (await image.readRasters({
+    interleave: true,
+    ...(sampledEvery > 1 ? { width, height, resampleMethod: 'nearest' } : {}),
+  })) as unknown as ArrayLike<number>
   const data = new Float32Array(width * height)
   let hMin = Infinity
   let hMax = -Infinity
@@ -52,8 +70,9 @@ export async function loadHeightField(url: string, meta: Meta): Promise<HeightFi
     data,
     width,
     height,
-    dx: geo ? px[0] : 1,
-    dy: geo ? px[1] : 1,
+    sampledEvery,
+    dx: (geo ? px[0] : 1) * sampledEvery,
+    dy: (geo ? px[1] : 1) * sampledEvery,
     hMin,
     hMax,
     units: meta.units,
@@ -82,8 +101,9 @@ export function pixelToWorld(hf: HeightField, col: number, row: number): [number
 export function pixelToMap(hf: HeightField, col: number, row: number): [number, number] | null {
   if (!hf.transform) return null
   const [a, b, c, d, e, f] = hf.transform
-  const px = col + 0.5
-  const py = row + 0.5
+  // transform is in source pixels; col/row are in the (possibly decimated) viewer grid
+  const px = (col + 0.5) * hf.sampledEvery
+  const py = (row + 0.5) * hf.sampledEvery
   return [a * px + b * py + c, d * px + e * py + f]
 }
 
@@ -212,6 +232,9 @@ export function buildTerrainGeometry(hf: HeightField, maxSide = 1536): { geometr
 
 /** Float texture of the full-resolution DSM for per-fragment contours, slope and colour ramps. */
 export function buildHeightTexture(hf: HeightField): THREE.DataTexture {
+  // A copy, not an in-place fill: hf.data keeps its NaNs so a probe over nodata still reports
+  // "no measurement" instead of silently reading the scene minimum. The sample cap in
+  // loadHeightField keeps this copy small enough to afford.
   const data = new Float32Array(hf.width * hf.height)
   for (let i = 0; i < data.length; i++) {
     const v = hf.data[i]

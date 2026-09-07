@@ -1,28 +1,47 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
-@import "@fontsource-variable/space-grotesk";
 @import "@fontsource-variable/jetbrains-mono";
 
+/*
+ * DepthWizard studio · "field instrument"
+ *
+ * One rule governs this file: the chrome is monochrome, and colour belongs to data. Height ramps,
+ * contours, the flood plane and validation error are the only things allowed to be colourful,
+ * because in this product a colour always means a measurement. The interface around them is warm
+ * graphite and paper, with a single amber reserved for "this is active" and "do this next".
+ *
+ * The warmth matters. A blue-black ground with a cyan accent is the default costume of every
+ * generated app; it also fights the browns and greens of real terrain. Warm graphite recedes
+ * behind the scene instead of competing with it.
+ */
 @theme {
-  --color-ground: #0b1016;
-  --color-panel: #10171f;
-  --color-panel-2: #151d27;
-  --color-raised: #1b2531;
-  --color-line: #223040;
-  --color-line-2: #2c3b4d;
-  --color-ink: #e8edf2;
-  --color-ink-2: #aab7c5;
-  --color-ink-3: #7f8fa1;
-  --color-accent: #22d3ee;
-  --color-accent-2: #0ea5c4;
-  --color-warm: #f5a524;
-  --color-danger: #f26d6d;
-  --color-ok: #4ade80;
-  --font-display: "Space Grotesk Variable", "Inter Variable", system-ui, sans-serif;
+  /* chrome: warm graphite, never blue-black */
+  --color-ground: #14120f;
+  --color-panel: #1a1714;
+  --color-panel-2: #211d19;
+  --color-raised: #2a2521;
+  --color-line: #2e2925;
+  --color-line-2: #3d372f;
+
+  /* ink: warm paper, not clinical white */
+  --color-ink: #f2ede4;
+  --color-ink-2: #b3aa9e;
+  --color-ink-3: #857c72;
+
+  /* the only chrome colour: active, primary, focus */
+  --color-accent: #e5a13c;
+  --color-accent-2: #c9832a;
+  --color-accent-ink: #1a1410;
+
+  /* status, used only where something is genuinely wrong or genuinely finished */
+  --color-danger: #e8705d;
+  --color-ok: #86b77a;
+
   --font-sans: "Inter Variable", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
-  --radius-panel: 14px;
-  --shadow-panel: 0 12px 32px -12px rgb(0 0 0 / 0.6), 0 2px 6px -2px rgb(0 0 0 / 0.5);
+
+  --radius-panel: 8px;
+  --shadow-panel: 0 16px 40px -20px rgb(0 0 0 / 0.75), 0 2px 8px -4px rgb(0 0 0 / 0.5);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -41,46 +60,46 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.5;
   overflow: hidden;
   font-feature-settings: "cv11", "ss01", "tnum";
 }
 
-::selection { background: color-mix(in oklab, var(--color-accent) 45%, transparent); color: #fff; }
-*:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 6px; }
+::selection { background: color-mix(in oklab, var(--color-accent) 40%, transparent); color: var(--color-ink); }
+*:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 5px; }
 * { scrollbar-width: thin; scrollbar-color: var(--color-line-2) transparent; }
-*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar { width: 11px; height: 11px; }
 *::-webkit-scrollbar-thumb { background: var(--color-line-2); border-radius: 8px; border: 3px solid var(--color-panel); }
 *::-webkit-scrollbar-track { background: transparent; }
 input[type="range"] { accent-color: var(--color-accent); }
-input[type="number"], input[type="text"] { font-variant-numeric: tabular-nums; }
 canvas { display: block; }
 
 @layer components {
-  .panel {
-    background: var(--color-panel);
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-panel);
-  }
+  /* Groups are separated by space and a hairline, not by drawing a box around everything. */
+  .panel { background: var(--color-panel); border: 1px solid var(--color-line); border-radius: var(--radius-panel); }
+
   .hud-chip {
-    background: color-mix(in oklab, var(--color-ground) 72%, transparent);
-    border: 1px solid color-mix(in oklab, var(--color-line-2) 70%, transparent);
-    backdrop-filter: blur(10px);
-    border-radius: 10px;
+    background: color-mix(in oklab, var(--color-ground) 78%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-line-2) 65%, transparent);
+    backdrop-filter: blur(12px);
+    border-radius: 7px;
   }
+
+  /* Section labels read as small caps, not shouted 10px uppercase. */
   .label {
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.01em;
     color: var(--color-ink-3);
     font-weight: 600;
   }
-  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
   .kbd {
     font-family: var(--font-mono);
     font-size: 11px;
-    padding: 1px 6px;
-    border-radius: 5px;
+    padding: 2px 6px;
+    border-radius: 4px;
     border: 1px solid var(--color-line-2);
     border-bottom-width: 2px;
     background: var(--color-raised);
@@ -89,5 +108,5 @@ canvas { display: block; }
 }
 
 @keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
-@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.rise { animation: rise 0.5s var(--ease-out-expo) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise 0.55s var(--ease-out-expo) both; }

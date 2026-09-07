@@ -1,13 +1,13 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
-import { api, type GCP, type Job, type Meta, type Metrics, type SystemInfo } from './lib/api'
+import { api, type GCP, type Job, type Meta, type Metrics, type RunOptions, type SystemInfo } from './lib/api'
 import { loadHeightField, type HeightField, type ProfileSample } from './lib/terrain'
 
 export type Mode = 'presentation' | 'analysis'
 export type Nav = 'orbit' | 'fly' | 'walk'
 export type Layer = 'texture' | 'hypsometric' | 'slope' | 'aspect' | 'hillshade'
 export type Tool = 'probe' | 'profile' | 'gcp' | 'none'
-export type Panel = 'view' | 'analyse' | 'validate' | 'data' | 'map'
+export type Panel = 'look' | 'measure' | 'check' | 'map'
 
 export interface Probe {
   col: number
@@ -33,6 +33,9 @@ export interface GcpPin extends GCP {
 interface State {
   system: SystemInfo | null
   online: boolean
+  /** Shared by every way of starting a run, so settings never silently reset between them. */
+  runOptions: RunOptions
+  showAdvanced: boolean
   jobs: Job[]
   jobId: string | null
   job: Job | null
@@ -92,6 +95,8 @@ export const useStore = create<State>()(
   subscribeWithSelector((set, get) => ({
     system: null,
     online: false,
+    runOptions: {},
+    showAdvanced: false,
     jobs: [],
     jobId: null,
     job: null,
@@ -103,7 +108,7 @@ export const useStore = create<State>()(
 
     mode: 'presentation',
     nav: 'orbit',
-    panel: 'view',
+    panel: 'look',
     exaggeration: 1,
     savedExaggeration: null,
     layer: 'texture',
@@ -129,7 +134,16 @@ export const useStore = create<State>()(
     boot: async () => {
       try {
         const system = await api.system()
-        set({ system, online: true })
+        set({
+          system,
+          online: true,
+          runOptions: {
+            model: system.defaults.model,
+            calibration: system.defaults.calibration,
+            dem_source: system.defaults.dem_source,
+            prior_p95_m: system.defaults.prior_p95_m,
+          },
+        })
       } catch {
         set({ online: false })
       }

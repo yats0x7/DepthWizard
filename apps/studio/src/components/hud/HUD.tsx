@@ -37,20 +37,20 @@ function Readout() {
   const source =
     meta.units === 'm'
       ? prior
-        ? 'metres from scene prior · datum arbitrary'
-        : `metric DSM · ${meta.calibration.mode}${meta.calibration.dem?.source ? ` · ${meta.calibration.dem.source}` : ''}`
-      : 'relative DSM (rDSM), unitless 0 to 1'
+        ? 'estimated metres, the zero point is arbitrary'
+        : 'real metres, anchored to an elevation map'
+      : 'relative height, 0 to 1, no real-world scale'
   return (
     <div className="hud-chip flex min-w-56 flex-col gap-1 px-3 py-2">
       <div className="flex items-baseline justify-between gap-4">
         <span className="label">{hover ? 'Under cursor' : probe ? 'Probe' : 'Height'}</span>
         <span className="text-[11px] text-ink-3">{p ? `px ${Math.round(p.col)}, ${Math.round(p.row)}` : ''}</span>
       </div>
-      <div className={cn('num text-[22px] leading-none', prior ? 'text-warm' : 'text-ink')}>
+      <div className={cn('num text-[22px] leading-none', prior ? 'text-accent' : 'text-ink')}>
         {p ? fmt(p.h, hf.units === 'm' ? 2 : 3) : '—'}
         <span className="ml-1 text-[12px] text-ink-3">{unit}</span>
       </div>
-      <div className="flex items-center justify-between text-[11px] text-ink-3">
+      <div className="flex items-center justify-between gap-3 text-[12px] text-ink-3">
         <span>{source}</span>
         {p && meta.input.georeferenced && Number.isFinite(p.slope) && <span className="num">{fmt(p.slope, 1)}° {compass(p.aspect)}</span>}
       </div>
@@ -179,6 +179,10 @@ function CoordChip() {
   )
 }
 
+const LAYER_NAME: Record<string, string> = {
+  texture: 'Photo', hypsometric: 'Height', slope: 'Steepness', aspect: 'Facing', hillshade: 'Relief',
+}
+
 const TURBO = 'linear-gradient(90deg,#30123b,#4662d7,#36aaf9,#1ae4b6,#72fe5e,#c8ef34,#faba39,#f66b19,#ca2a04,#7a0403)'
 const VIRIDIS = 'linear-gradient(90deg,#440154,#414487,#2a788e,#22a884,#7ad151,#fde725)'
 const ASPECT = 'linear-gradient(90deg,#f2400f,#f2f20f,#0ff20f,#0ff2f2,#0f0ff2,#f20ff2,#f2400f)'
@@ -248,15 +252,15 @@ export function HUD() {
       </div>
 
       <div className="absolute left-4 top-4 flex flex-col gap-2">
-        <div className={cn('hud-chip flex items-center gap-2 px-2.5 py-1.5 text-[12px]', exaggeration !== 1 ? 'text-warm' : 'text-ink-2')}>
+        <div className={cn('hud-chip flex items-center gap-2 px-2.5 py-1.5 text-[12px]', exaggeration !== 1 ? 'text-accent' : 'text-ink-2')}>
           <Mountain size={14} />
           <span className="num">×{exaggeration.toFixed(2)}</span>
           <span className="text-ink-3">vertical</span>
           {mode === 'analysis' && <Lock size={12} className="text-ink-3" />}
         </div>
-        <div className="hud-chip flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-ink-2">
+        <div className="hud-chip flex items-center gap-2 px-2.5 py-1.5 text-[12.5px] text-ink-2">
           <Layers size={14} />
-          <span className="capitalize">{layer}</span>
+          <span>{LAYER_NAME[layer]}</span>
         </div>
         <div className="hud-chip flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-ink-2">
           {locked ? <Navigation size={14} /> : <MousePointer2 size={14} />}

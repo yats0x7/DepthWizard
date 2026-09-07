@@ -18,7 +18,7 @@ export function JobProgress({ job }: { job: Job }) {
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             exit={{ opacity: 0, y: -14, filter: 'blur(4px)' }}
             transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-            className="font-display text-[24px] font-semibold tracking-tight text-ink"
+            className="text-[24px] font-semibold tracking-tight text-ink"
           >
             {STAGE_LABEL[job.stage] ?? job.stage}
           </motion.div>

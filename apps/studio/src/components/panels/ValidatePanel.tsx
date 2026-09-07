@@ -4,17 +4,18 @@ import { useStore } from '../../store'
 import { api, type MetricBlock } from '../../lib/api'
 import { fmt, fmtInt } from '../../lib/format'
 import { Button, Input, Section, Stat } from '../ui'
+import { DataPanel } from './DataPanel'
 
 function Block({ title, m, unit, note }: { title: string; m: MetricBlock; unit: string; note?: string }) {
   return (
     <div className="flex flex-col rounded-lg border border-line bg-panel-2/60 px-3 py-2">
       <div className="flex items-baseline justify-between pb-1">
-        <span className="font-display text-[13px] font-semibold">{title}</span>
+        <span className="text-[13px] font-semibold">{title}</span>
         {note && <span className="text-[11px] text-ink-3">{note}</span>}
       </div>
-      <Stat label="RMSE" value={fmt(m.rmse, 2)} unit={unit} tone="warm" />
-      <Stat label="MAE" value={fmt(m.mae, 2)} unit={unit} tone="warm" />
-      <Stat label="Pearson r" value={fmt(m.pearson_r, 3)} tone="warm" />
+      <Stat label="RMSE" value={fmt(m.rmse, 2)} unit={unit} tone="accent" />
+      <Stat label="MAE" value={fmt(m.mae, 2)} unit={unit} tone="accent" />
+      <Stat label="Pearson r" value={fmt(m.pearson_r, 3)} tone="accent" />
       <Stat label="Bias (mean error)" value={fmt(m.bias, 2)} unit={unit} />
       <Stat label="NMAD" value={fmt(m.nmad, 2)} unit={unit} />
       <Stat label="|error| p90" value={fmt(m.abs_error_p90, 2)} unit={unit} />
@@ -97,7 +98,8 @@ export function ValidatePanel() {
           )}
         </Section>
       )}
-      {m?.error && <p className="px-4 py-3 text-[12px] text-danger">{m.error}</p>}
+      {m?.error && <p className="px-4 py-3 text-[13px] text-danger">{m.error}</p>}
+      <DataPanel />
     </>
   )
 }

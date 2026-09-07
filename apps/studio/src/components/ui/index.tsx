@@ -136,11 +136,11 @@ export function Progress({ value, className, active }: { value: number; classNam
   )
 }
 
-export function Stat({ label, value, unit, tone }: { label: string; value: string; unit?: string; tone?: 'warm' | 'accent' }) {
+export function Stat({ label, value, unit, tone }: { label: string; value: string; unit?: string; tone?: 'accent' | 'muted' }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1">
       <span className="text-[12px] text-ink-3">{label}</span>
-      <span className={cn('num text-[13px]', tone === 'warm' && 'text-warm', tone === 'accent' && 'text-accent')}>
+      <span className={cn('num text-[13px]', tone === 'accent' && 'text-accent', tone === 'accent' && 'text-accent')}>
         {value}
         {unit && <span className="ml-0.5 text-[11px] text-ink-3">{unit}</span>}
       </span>
@@ -152,7 +152,7 @@ export function Section({ title, children, right }: { title: string; children: R
   return (
     <section className="flex flex-col gap-3 border-b border-line px-4 py-4 last:border-b-0">
       <div className="flex items-center justify-between">
-        <h3 className="font-display text-[13px] font-semibold tracking-tight text-ink">{title}</h3>
+        <h3 className="text-[13px] font-semibold tracking-tight text-ink">{title}</h3>
         {right}
       </div>
       {children}

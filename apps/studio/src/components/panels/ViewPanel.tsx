@@ -5,6 +5,7 @@ import { fmt } from '../../lib/format'
 
 export function ViewPanel() {
   const s = useStore()
+  if (!s.heightField || !s.meta) return null
   const hf = s.heightField
   const metric = hf?.units === 'm'
   const relief = hf ? hf.hMax - hf.hMin : 1
@@ -13,14 +14,14 @@ export function ViewPanel() {
     : [0.02, 0.05, 0.1].filter((v) => relief / v >= 2 && relief / v <= 400)
   return (
     <>
-      <Section title="Mode">
+      <Section title="Presentation or Analysis">
         <p className="text-[12px] leading-relaxed text-ink-3">
           {s.mode === 'presentation'
             ? 'Sky, sun shadows, ambient occlusion and tone mapping. The geometry is the same DSM as in Analysis.'
             : 'Flat, neutral lighting with an analytic hillshade. No post-processing. Exaggeration locked at 1.00.'}
         </p>
       </Section>
-      <Section title="Navigate">
+      <Section title="Move around">
         <Segmented<Nav>
           id="nav"
           size="sm"
@@ -40,11 +41,11 @@ export function ViewPanel() {
           ))}
         </div>
       </Section>
-      <Section title="Vertical exaggeration" right={<span className={`num text-[12px] ${s.exaggeration !== 1 ? 'text-warm' : 'text-ink-3'}`}>×{s.exaggeration.toFixed(2)}</span>}>
+      <Section title="Stretch the heights" right={<span className={`num text-[12px] ${s.exaggeration !== 1 ? 'text-accent' : 'text-ink-3'}`}>×{s.exaggeration.toFixed(2)}</span>}>
         <Slider value={s.exaggeration} min={0.5} max={4} step={0.05} disabled={s.mode === 'analysis'} onChange={(v) => s.set('exaggeration', v)} format={(v) => `×${v.toFixed(2)}`} />
         <p className="text-[11px] text-ink-3">{s.mode === 'analysis' ? 'Locked at ×1.00 in Analysis mode so every reading matches the surface you see.' : 'Display only. Readouts always report true DSM heights.'}</p>
       </Section>
-      <Section title="Surface layer">
+      <Section title="Colour the surface by">
         <Segmented<Layer>
           id="layer"
           size="sm"
@@ -52,14 +53,14 @@ export function ViewPanel() {
           value={s.layer}
           onChange={(v) => s.set('layer', v)}
           options={[
-            { value: 'texture', label: 'Image' },
+            { value: 'texture', label: 'Photo' },
             { value: 'hypsometric', label: 'Height' },
             { value: 'slope', label: 'Slope', disabled: !s.meta?.input.georeferenced, title: s.meta?.input.georeferenced ? 'Slope in degrees' : 'Needs georeferencing' },
             { value: 'aspect', label: 'Aspect', disabled: !s.meta?.input.georeferenced, title: s.meta?.input.georeferenced ? 'Downslope direction' : 'Needs georeferencing' },
             { value: 'hillshade', label: 'Relief' },
           ]}
         />
-        <Field label="Contours" hint={metric ? 'metres' : 'relative units'}>
+        <Field label="Contour lines" hint={metric ? 'metres' : 'relative units'}>
           <Select value={String(s.contourStep)} onChange={(e) => s.set('contourStep', Number(e.target.value))}>
             <option value="0">Off</option>
             {contourOptions.map((v) => (
@@ -69,7 +70,7 @@ export function ViewPanel() {
             ))}
           </Select>
         </Field>
-        <Field label="Mesh detail" hint={hf ? `stride ${Math.max(1, Math.ceil(Math.max(hf.width, hf.height) / s.meshDetail))} px` : ''}>
+        <Field label="Surface detail" hint={hf ? `every ${Math.max(1, Math.ceil(Math.max(hf.width, hf.height) / s.meshDetail))} pixels` : ''}>
           <Select value={String(s.meshDetail)} onChange={(e) => s.set('meshDetail', Number(e.target.value))}>
             <option value="512">Light (512 grid)</option>
             <option value="1024">Balanced (1024 grid)</option>
@@ -78,11 +79,11 @@ export function ViewPanel() {
             <option value="8192">Full resolution</option>
           </Select>
         </Field>
-        {s.mode === 'analysis' && <Switch label="Wireframe (exact vertices)" checked={s.wireframe} onChange={(v) => s.set('wireframe', v)} />}
+        {s.mode === 'analysis' && <Switch label="Show the mesh wireframe" checked={s.wireframe} onChange={(v) => s.set('wireframe', v)} />}
         <Switch label="Minimap" checked={s.showMinimap} onChange={(v) => s.set('showMinimap', v)} />
       </Section>
       {s.mode === 'presentation' && (
-        <Section title="Light" right={<Sun size={14} className="text-warm" />}>
+        <Section title="Sun" right={<Sun size={14} className="text-accent" />}>
           <Field label="Sun azimuth" hint={`${Math.round(s.sun.azimuth)}° from north`}>
             <Slider value={s.sun.azimuth} min={0} max={360} step={1} onChange={(v) => s.set('sun', { ...s.sun, azimuth: v })} format={(v) => `${Math.round(v)}°`} />
           </Field>
@@ -90,7 +91,7 @@ export function ViewPanel() {
             <Slider value={s.sun.elevation} min={4} max={80} step={1} onChange={(v) => s.set('sun', { ...s.sun, elevation: v })} format={(v) => `${Math.round(v)}°`} />
           </Field>
           <Switch label="Shadows" checked={s.shadows} onChange={(v) => s.set('shadows', v)} />
-          <Switch label="Ambient occlusion, bloom, vignette" checked={s.effects} onChange={(v) => s.set('effects', v)} />
+          <Switch label="Cinematic effects" checked={s.effects} onChange={(v) => s.set('effects', v)} />
         </Section>
       )}
       <Section title="Shortcuts" right={<Compass size={14} className="text-ink-3" />}>
@@ -103,7 +104,7 @@ export function ViewPanel() {
         </dl>
       </Section>
       <div className="flex items-center gap-2 px-4 py-3 text-[11px] text-ink-3">
-        <Layers3 size={12} /> Mesh vertices are exact DSM samples; lower detail skips samples, never averages them. Readouts: {fmt(relief, metric ? 1 : 3)} {metric ? 'm' : ''} relief. <Eye size={12} />
+        <Layers3 size={12} /> Corners of the surface sit on real measurements. Lower detail skips samples, it never averages them. Readouts: {fmt(relief, metric ? 1 : 3)} {metric ? 'm' : ''} relief. <Eye size={12} />
       </div>
     </>
   )

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Crosshair, MapPin, Spline, Trash2, Waves } from 'lucide-react'
 import { useStore, type Tool } from '../../store'
 import { api } from '../../lib/api'
@@ -14,6 +14,7 @@ export function AnalysePanel() {
   const [gcpZ, setGcpZ] = useState('')
   const [calMode, setCalMode] = useState<string>('')
   const [busy, setBusy] = useState(false)
+  const floodPct = useMemo(() => (hf ? floodFraction(hf, s.flood.level) * 100 : 0), [hf, s.flood.level])
   const [msg, setMsg] = useState<string | null>(null)
   if (!hf || !meta || !s.jobId) return null
   const unit = hf.units === 'm' ? 'm' : ''
@@ -62,7 +63,9 @@ export function AnalysePanel() {
               <span className="ml-1 text-[13px] text-ink-3">{unit || 'relative'}</span>
             </div>
             <p className="pb-2 text-[11px] leading-relaxed text-ink-3">
-              Source: {meta.units === 'm' ? `metric DSM, ${meta.calibration.mode} calibration${meta.calibration.dem?.source ? ` against ${meta.calibration.dem.source}` : ''}${meta.calibration.gcp_count ? `, ${meta.calibration.gcp_count} GCP` : ''}` : 'relative DSM in [0, 1]; no absolute scale. Add GCPs for metres.'}
+              {meta.units === 'm'
+                ? `Real metres, ${meta.calibration.gcp_count ? `anchored to ${meta.calibration.gcp_count} known height${meta.calibration.gcp_count === 1 ? '' : 's'}` : meta.calibration.dem?.source ? 'anchored to a public elevation map' : 'estimated from the scene'}. Read from the elevation data, not the picture.`
+                : 'Relative height, 0 to 1. Add two known heights below to convert the whole model to metres.'}
             </p>
             <Stat label="Above scene minimum" value={fmt(p.h - hf.hMin, hf.units === 'm' ? 2 : 3)} unit={unit} />
             {meta.input.georeferenced ? (
@@ -120,12 +123,12 @@ export function AnalysePanel() {
       <Section title="Flood level" right={<Waves size={14} className="text-accent" />}>
         <Switch label="Show water plane" checked={s.flood.on} onChange={(v) => s.set('flood', { ...s.flood, on: v })} />
         <Slider value={s.flood.level} min={hf.hMin} max={hf.hMax} step={relief / 400} disabled={!s.flood.on} onChange={(v) => s.set('flood', { ...s.flood, level: v })} format={(v) => `${fmt(v, hf.units === 'm' ? 1 : 3)}${unit}`} />
-        <p className="num text-[11px] text-ink-3">{fmt(floodFraction(hf, s.flood.level) * 100, 1)}% of valid pixels below this level (sampled)</p>
+        <p className="num text-[11px] text-ink-3">{fmt(floodPct, 1)}% of the area is below this level</p>
       </Section>
 
       <Section title="Ground control points">
         {s.pendingGcp ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-warm/40 bg-warm/5 p-2.5">
+          <div className="flex flex-col gap-2 rounded-lg border border-accent/40 bg-accent/5 p-2.5">
             <span className="text-[12px] text-ink-2">Known height at px {Math.round(s.pendingGcp.col)}, {Math.round(s.pendingGcp.row)}</span>
             <div className="flex gap-2">
               <Input type="number" step="0.01" placeholder="height in metres" value={gcpZ} onChange={(e) => setGcpZ(e.target.value)} autoFocus />
@@ -152,7 +155,7 @@ export function AnalysePanel() {
           <ul className="flex flex-col divide-y divide-line">
             {s.gcps.map((g) => (
               <li key={g.id} className="flex items-center justify-between py-1.5 text-[12px]">
-                <span className="num text-warm">{fmt(g.z, 2)} m</span>
+                <span className="num text-accent">{fmt(g.z, 2)} m</span>
                 <span className="num text-ink-3">px {Math.round(g.col)}, {Math.round(g.row)}</span>
                 <button onClick={() => s.removeGcp(g.id)} className="text-ink-3 hover:text-danger" aria-label="Remove GCP">
                   <Trash2 size={13} />
