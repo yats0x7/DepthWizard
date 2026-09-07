@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import maplibregl, { type Map as MapInstance, type Marker } from 'maplibre-gl'
+import maplibregl, { type Map as MapInstance, type Marker, type StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { MapPin, Play, Search } from 'lucide-react'
 import { api, type ImageryItem } from '../../lib/api'
@@ -8,6 +8,32 @@ import { Button, Field, Input, Progress, Slider } from '../ui'
 import { useRunOptions } from '../jobs/NewJob'
 
 const DEFAULT_CENTER: [number, number] = [77.5946, 12.9716]
+
+/**
+ * Basemaps are for looking at only. Nothing here is ever fed to the pipeline: the imagery that gets
+ * processed comes from the licensed sources in `engine/depthwizard/imagery`, which permit deriving
+ * products. Esri's tiles are shown the way any web map shows a basemap and are attributed below.
+ */
+const SATELLITE_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    imagery: {
+      type: 'raster',
+      tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: 'Basemap: Esri, Maxar, Earthstar Geographics (view only)',
+    },
+  },
+  layers: [{ id: 'imagery', type: 'raster', source: 'imagery' }],
+}
+
+const BASEMAPS: Record<string, { label: string; style: StyleSpecification | string }> = {
+  satellite: { label: 'Satellite', style: SATELLITE_STYLE },
+  streets: { label: 'Streets', style: 'https://tiles.openfreemap.org/styles/liberty' },
+}
+
+type BasemapId = 'satellite' | 'streets'
 
 function bboxAround(center: [number, number], sizeKm: number): number[] {
   const [lon, lat] = center
@@ -34,6 +60,7 @@ export function MapPanel() {
   const [selected, setSelected] = useState<ImageryItem | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [basemap, setBasemap] = useState<BasemapId>('satellite')
   const [opts] = useRunOptions()
   const refreshJobs = useStore((s) => s.refreshJobs)
   const openJob = useStore((s) => s.openJob)
@@ -43,9 +70,9 @@ export function MapPanel() {
     if (!container.current) return
     const instance = new maplibregl.Map({
       container: container.current,
-      style: 'https://tiles.openfreemap.org/styles/liberty',
+      style: SATELLITE_STYLE,
       center,
-      zoom: 11,
+      zoom: 14,
       attributionControl: { compact: true },
     })
     instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
@@ -64,9 +91,15 @@ export function MapPanel() {
     }
   }, [])
 
+  // Switching basemap replaces every source and layer, so the box is drawn again afterwards.
+  useEffect(() => {
+    const instance = map.current
+    if (!instance) return
+    instance.setStyle(BASEMAPS[basemap].style)
+  }, [basemap])
+
   useEffect(() => {
     marker.current?.setLngLat(center)
-    map.current?.flyTo({ center, duration: 500 })
     const feature = {
       type: 'Feature',
       geometry: {
@@ -77,15 +110,25 @@ export function MapPanel() {
       },
       properties: {},
     }
-    const source = map.current?.getSource('selection') as maplibregl.GeoJSONSource | undefined
-    if (source) source.setData(feature as Parameters<typeof source.setData>[0])
-    else if (map.current) {
-      map.current.once('load', () => {
-        if (!map.current || map.current.getSource('selection')) return
-        map.current.addSource('selection', { type: 'geojson', data: feature as never })
-        map.current.addLayer({ id: 'selection-fill', type: 'fill', source: 'selection', paint: { 'fill-color': '#22d3ee', 'fill-opacity': 0.12 } })
-        map.current.addLayer({ id: 'selection-line', type: 'line', source: 'selection', paint: { 'line-color': '#22d3ee', 'line-width': 2 } })
-      })
+    const draw = () => {
+      const instance = map.current
+      if (!instance || !instance.isStyleLoaded()) return
+      const source = instance.getSource('selection') as maplibregl.GeoJSONSource | undefined
+      if (source) {
+        source.setData(feature as Parameters<typeof source.setData>[0])
+        return
+      }
+      instance.addSource('selection', { type: 'geojson', data: feature as never })
+      instance.addLayer({ id: 'selection-fill', type: 'fill', source: 'selection', paint: { 'fill-color': '#22d3ee', 'fill-opacity': 0.12 } })
+      instance.addLayer({ id: 'selection-line', type: 'line', source: 'selection', paint: { 'line-color': '#22d3ee', 'line-width': 2 } })
+    }
+    draw()
+    map.current?.on('styledata', draw)
+    // Frame the box rather than keeping whatever zoom the map happened to be at, so a 3 km
+    // selection fills the view instead of sitting invisible inside a country-wide view.
+    map.current?.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding: 28, duration: 600, maxZoom: 17 })
+    return () => {
+      map.current?.off('styledata', draw)
     }
   }, [bbox, center])
 
@@ -163,7 +206,21 @@ export function MapPanel() {
       {places.length > 0 && <div className="flex flex-col gap-1 rounded-lg border border-line-2 bg-panel-2 p-1">
         {places.map((place) => <button key={`${place.name}-${place.center.join(',')}`} className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] text-ink-2 hover:bg-raised" onClick={() => { setCenter(place.center); setPlaces([]) }}><MapPin size={13} className="text-accent" />{place.name || 'Unnamed place'}</button>)}
       </div>}
-      <div ref={container} className="h-52 overflow-hidden rounded-panel border border-line-2" />
+      <div className="flex items-center justify-between">
+        <span className="label">View</span>
+        <div className="flex gap-1">
+          {(['satellite', 'streets'] as BasemapId[]).map((id) => (
+            <button
+              key={id}
+              onClick={() => setBasemap(id)}
+              className={`rounded-md px-2 py-1 text-[11px] transition-colors ${basemap === id ? 'bg-accent text-ground' : 'border border-line-2 text-ink-2 hover:text-ink'}`}
+            >
+              {BASEMAPS[id].label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div ref={container} className="h-72 overflow-hidden rounded-panel border border-line-2" />
       <div className="flex flex-col gap-2">
         <Field label="Selection box" hint={`${areaKm2(bbox).toFixed(2)} km²`}>
           <Slider value={sizeKm} min={0.5} max={10} step={0.5} onChange={setSizeKm} format={(v) => `${v.toFixed(1)} km`} />
