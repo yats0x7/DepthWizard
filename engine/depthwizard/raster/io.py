@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
@@ -29,6 +29,7 @@ class RasterInput:
     nodata_mask: np.ndarray | None = None  # True where the source has no data
     downscale: float = 1.0  # source px / working px
     source_shape: tuple[int, int] | None = None
+    warnings: list[str] = field(default_factory=list)  # plain-language notes about the input file
 
     @property
     def georeferenced(self) -> bool:
@@ -99,6 +100,43 @@ def _resize_mask(mask: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
     )
 
 
+ELEVATION_HINT_RANGE = (-500.0, 9000.0)  # plausible metres above sea level
+
+
+def inspect_input(ds, data: np.ndarray, nodata_mask: np.ndarray | None) -> list[str]:
+    """Plain-language notes about a raster that will surprise the user if left unsaid.
+
+    Two mistakes are common and neither raises an error, so both would otherwise pass silently:
+    a GeoTIFF whose coordinates were stripped by an image editor, and an elevation raster uploaded
+    where an optical photo belongs.
+    """
+    notes: list[str] = []
+    if ds.crs is None or ds.transform is None or ds.transform.is_identity:
+        notes.append(
+            "This GeoTIFF carries no coordinate system, so heights come out relative (0 to 1) rather "
+            "than in metres. Image editors and format converters strip that information; download the "
+            "original file, or place the area from the Map panel instead. Ground control points also "
+            "convert a relative result to metres."
+        )
+    if ds.count == 1 and str(ds.dtypes[0]).startswith("float"):
+        band = data[0]
+        valid = band[~nodata_mask] if nodata_mask is not None else band
+        valid = valid[np.isfinite(valid)]
+        if (
+            valid.size
+            and ELEVATION_HINT_RANGE[0] < float(valid.min())
+            and float(valid.max()) < ELEVATION_HINT_RANGE[1]
+        ):
+            notes.append(
+                f"This looks like an elevation raster, not a photo: one floating-point band ranging "
+                f"{float(valid.min()):.0f} to {float(valid.max()):.0f}. DepthWizard estimates height "
+                "from optical imagery, so feeding it a height map produces a guess about a picture of "
+                "heights. Upload the matching RGB image instead, and use this file under Validate as "
+                "the reference to measure against."
+            )
+    return notes
+
+
 def load_image(path: str | Path, max_dim: int = 6000) -> RasterInput:
     """Load a PNG/JPG (non-georeferenced) or a GeoTIFF (georeferenced when CRS + transform exist)."""
     path = Path(path)
@@ -114,6 +152,7 @@ def load_image(path: str | Path, max_dim: int = 6000) -> RasterInput:
             if alpha_bands:  # RGB+NIR is not RGBA: only a band declared as alpha masks pixels
                 alpha = ds.read(alpha_bands[0])
                 nodata_mask = (alpha == 0) if nodata_mask is None else nodata_mask | (alpha == 0)
+            warnings = list(inspect_input(ds, data, nodata_mask))
             bands = [_stretch_to_uint8(b, nodata_mask) for b in data]
             if len(bands) == 1:
                 bands = bands * 3
@@ -135,6 +174,7 @@ def load_image(path: str | Path, max_dim: int = 6000) -> RasterInput:
             nodata_mask=nodata_mask,
             downscale=f,
             source_shape=src_shape,
+            warnings=warnings,
         )
 
     img = ImageOps.exif_transpose(Image.open(path))

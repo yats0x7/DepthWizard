@@ -169,6 +169,7 @@ def run(
             "centre4326": list(src.centre4326) if src.centre4326 else None,
             "pixel_size_m": list(src.pixel_size_m) if src.pixel_size_m else None,
             "nodata_fraction": float(src.nodata_mask.mean()) if src.nodata_mask is not None else 0.0,
+            "warnings": list(src.warnings),
         },
     }
     if source_metadata:

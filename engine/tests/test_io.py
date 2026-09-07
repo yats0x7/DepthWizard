@@ -69,3 +69,53 @@ def test_gcps_ignore_out_of_range_and_use_neighbours_for_nan():
     dsm[2, 2] = np.nan
     out, cal = apply_gcps(dsm, [GCP(2, 2, 50.0), GCP(50, 50, 9.0)], Calibration(mode="relative"))
     assert cal.gcp_count == 1 and abs(out[5, 5] - 50.0) < 1e-4
+
+
+def test_warns_when_geotiff_lost_its_coordinates(tmp_path):
+    """An image editor re-saving a GeoTIFF strips the CRS; the user must be told why it went relative."""
+    p = tmp_path / "stripped.tif"
+    rgb = np.full((3, 32, 32), 120, np.uint8)
+    with rasterio.open(p, "w", driver="GTiff", height=32, width=32, count=3, dtype="uint8") as ds:
+        ds.write(rgb)
+    src = load_image(p)
+    assert not src.georeferenced
+    assert any("no coordinate system" in w for w in src.warnings)
+
+
+def test_warns_when_an_elevation_raster_is_uploaded_as_imagery(tmp_path):
+    p = tmp_path / "exportImage.tiff"
+    y, x = np.mgrid[0:32, 0:32]
+    dem = (68 + y * 3.5).astype(np.float32)
+    with rasterio.open(
+        p,
+        "w",
+        driver="GTiff",
+        height=32,
+        width=32,
+        count=1,
+        dtype="float32",
+        nodata=-9999.0,
+        crs=CRS.from_epsg(4326),
+        transform=from_origin(-104.99, 39.75, 1e-4, 1e-4),
+    ) as ds:
+        ds.write(dem, 1)
+    src = load_image(p)
+    assert any("looks like an elevation raster" in w for w in src.warnings)
+
+
+def test_a_normal_rgb_geotiff_warns_about_nothing(tmp_path):
+    p = tmp_path / "clean.tif"
+    rgb = np.full((3, 32, 32), 120, np.uint8)
+    with rasterio.open(
+        p,
+        "w",
+        driver="GTiff",
+        height=32,
+        width=32,
+        count=3,
+        dtype="uint8",
+        crs=CRS.from_epsg(32643),
+        transform=from_origin(500000, 1500000, 5, 5),
+    ) as ds:
+        ds.write(rgb)
+    assert load_image(p).warnings == []

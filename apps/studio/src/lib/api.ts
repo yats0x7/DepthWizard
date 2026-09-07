@@ -87,6 +87,7 @@ export interface Meta {
     centre4326: [number, number] | null
     pixel_size_m: [number, number] | null
     nodata_fraction: number
+    warnings?: string[]
   }
   model: { id: string; preset: string; device: string; tta: boolean; infer_res: number; tile: number }
   units: 'm' | 'relative'

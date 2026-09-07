@@ -1,4 +1,4 @@
-import { Download, ExternalLink } from 'lucide-react'
+import { Download, ExternalLink, Info } from 'lucide-react'
 import { useStore } from '../../store'
 import { api, desktop } from '../../lib/api'
 import { fmt, fmtInt, fmtSeconds } from '../../lib/format'
@@ -26,6 +26,7 @@ export function DataPanel() {
   const m = s.meta
   if (!m || !s.jobId) return null
   const unit = m.units === 'm' ? 'm' : ''
+  const warnings = m.input.warnings ?? []
   const files: [string, string, string][] = [
     ['dsm', m.files.dsm ? 'DSM GeoTIFF (Float32)' : 'Relative DSM GeoTIFF', m.files.dsm ?? m.files.rdsm],
     ['heightmap', '16-bit heightmap PNG', 'heightmap.png'],
@@ -43,6 +44,18 @@ export function DataPanel() {
   }
   return (
     <>
+      {warnings.length > 0 && (
+        <Section title={warnings.length === 1 ? 'About this file' : 'About this file'}>
+          <ul className="flex flex-col gap-2">
+            {warnings.map((w, i) => (
+              <li key={i} className="flex gap-2 rounded-lg border border-warm/35 bg-warm/5 px-2.5 py-2 text-[12px] leading-relaxed text-ink-2">
+                <Info size={14} className="mt-0.5 shrink-0 text-warm" />
+                <span>{w}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
       <Section title="Input">
         <Stat label="File" value={m.input.name} />
         <Stat label="Working grid" value={`${m.input.shape[1]} × ${m.input.shape[0]} px`} />
