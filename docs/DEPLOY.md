@@ -11,9 +11,33 @@ there. The studio alone can, and it is useful only when pointed at an engine run
 The Docker image serves the API **and** the built studio from one process, so the whole product is a
 single container. That is the simplest deployment and the one to prefer.
 
-## Option A, recommended: one Hugging Face Space
+## Option A, recommended for a demo: a tunnel to this machine
 
-Free CPU tier, 16 GB RAM, no card required, and the model cache lives next door.
+Free, needs no account, and it is the *fastest* option because inference stays on the local GPU
+rather than a shared free CPU. The engine already serves the API and the studio together, so one
+tunnel publishes the whole product.
+
+```bash
+brew install cloudflared
+depthwizard serve --host 127.0.0.1 --port 8000        # or: pnpm engine
+cloudflared tunnel --protocol http2 --url http://127.0.0.1:8000
+```
+
+`--protocol http2` matters on networks that block QUIC on UDP 7844; without it the tunnel registers
+but Cloudflare cannot reach it and every request returns error 1033.
+
+The printed `*.trycloudflare.com` address serves the full app. It is random and unlisted, it lasts
+only while the command runs, and it goes away when the machine sleeps. Anyone holding the link can
+upload imagery and spend this machine's GPU time, so treat it as a link you hand to judges and
+teammates rather than something you post. `/api/jobs/from-path` stays disabled unless
+`DW_DESKTOP_TOKEN` is set, so a public tunnel cannot be used to read local files. Stop it with
+`pkill -f "cloudflared tunnel"`.
+
+## Option B: one Hugging Face Space
+
+Always on, so the link survives the laptop closing. Note that Hugging Face now requires a **PRO**
+subscription for Docker Spaces on the free CPU tier, public or private alike; only static Spaces are
+free, and a static Space cannot run the engine. The Dockerfile below is ready either way.
 
 ```bash
 hf auth login                       # needs a token from huggingface.co/settings/tokens
@@ -32,7 +56,7 @@ Expect several minutes for the first build (PyTorch download) and minutes per sc
 than the seconds a GPU takes. Job outputs are cleared when the Space restarts, which is fine for a
 demo but not for keeping results.
 
-## Option B: studio on Vercel, engine on a container host
+## Option C: studio on Vercel, engine on a container host
 
 Use this when a `vercel.app` URL matters. `vercel.json` at the repository root already builds only
 the studio.
@@ -55,7 +79,7 @@ Container hosts that fit the engine: Hugging Face Spaces (free), Railway (free c
 volume), Fly.io (free allowance, volumes), Render (needs a paid instance; the free tier's 512 MB of
 memory is below what PyTorch needs). All of them build `docker/engine.Dockerfile` unchanged.
 
-## Option C: your own machine or a VM
+## Option D: your own machine or a VM
 
 ```bash
 docker compose up --build           # http://localhost:8000, API and studio together
