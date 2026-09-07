@@ -66,5 +66,5 @@ export function AnalysisBackdrop() {
   useEffect(() => {
     scene.fog = null
   }, [scene])
-  return <color attach="background" args={['#0e141b']} />
+  return <color attach="background" args={['#14120f']} />
 }

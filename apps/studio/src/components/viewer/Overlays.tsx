@@ -63,26 +63,26 @@ export function Overlays({ hf, size }: { hf: HeightField; size: number }) {
       {hover && nav === 'orbit' && !probe && (
         <mesh position={[hover.x, y(hover.h) + lift, hover.z]} rotation-x={-Math.PI / 2}>
           <ringGeometry args={[ms * 1.2, ms * 1.8, 32]} />
-          <meshBasicMaterial color="#22d3ee" transparent opacity={0.8} toneMapped={false} depthTest={false} />
+          <meshBasicMaterial color="#e5a13c" transparent opacity={0.8} toneMapped={false} depthTest={false} />
         </mesh>
       )}
-      {probe && <Marker x={probe.x} y={y(probe.h)} z={probe.z} color="#22d3ee" size={ms} label={`${fmt(probe.h, 2)}${unit}`} />}
+      {probe && <Marker x={probe.x} y={y(probe.h)} z={probe.z} color="#e5a13c" size={ms} label={`${fmt(probe.h, 2)}${unit}`} />}
       {pins.map((p) => (
-        <Marker key={p.id} x={p.x} y={y(p.h)} z={p.z} color="#e8edf2" size={ms * 0.8} label={`${fmt(p.h, 2)}${unit}`} onRemove={() => removePin(p.id)} />
+        <Marker key={p.id} x={p.x} y={y(p.h)} z={p.z} color="#f2ede4" size={ms * 0.8} label={`${fmt(p.h, 2)}${unit}`} onRemove={() => removePin(p.id)} />
       ))}
       {gcps.map((g) => (
-        <Marker key={g.id} x={g.wx} y={y(sampleHeight(hf, g.col, g.row))} z={g.wz} color="#f5a524" size={ms} label={`GCP ${fmt(g.z, 2)} m`} onRemove={() => removeGcp(g.id)} />
+        <Marker key={g.id} x={g.wx} y={y(sampleHeight(hf, g.col, g.row))} z={g.wz} color="#86b77a" size={ms} label={`GCP ${fmt(g.z, 2)} m`} onRemove={() => removeGcp(g.id)} />
       ))}
       {pendingGcp && (
-        <Marker x={pendingGcp.x} y={y(sampleHeight(hf, pendingGcp.col, pendingGcp.row))} z={pendingGcp.z} color="#f5a524" size={ms} label="GCP: enter height" />
+        <Marker x={pendingGcp.x} y={y(sampleHeight(hf, pendingGcp.col, pendingGcp.row))} z={pendingGcp.z} color="#86b77a" size={ms} label="GCP: enter height" />
       )}
       {profile.a && (
         <mesh position={[profile.a[0], y(hf.hMin) + lift, profile.a[1]]} rotation-x={-Math.PI / 2}>
           <circleGeometry args={[ms * 1.4, 24]} />
-          <meshBasicMaterial color="#f5a524" toneMapped={false} depthTest={false} />
+          <meshBasicMaterial color="#e5a13c" toneMapped={false} depthTest={false} />
         </mesh>
       )}
-      {profilePoints && <Line points={profilePoints} color="#f5a524" lineWidth={2.5} depthTest={false} />}
+      {profilePoints && <Line points={profilePoints} color="#e5a13c" lineWidth={2.5} depthTest={false} />}
       {flood.on && (
         <mesh position={[0, y(flood.level), 0]} rotation-x={-Math.PI / 2}>
           <planeGeometry args={[(hf.width - 1) * hf.dx * 1.02, (hf.height - 1) * hf.dy * 1.02]} />

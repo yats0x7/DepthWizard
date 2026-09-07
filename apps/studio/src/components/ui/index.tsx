@@ -10,7 +10,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
       className={cn(
         'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-[background,color,border,transform] duration-150 active:translate-y-px disabled:pointer-events-none disabled:opacity-45',
         size === 'sm' ? 'h-7 px-2.5 text-[12px]' : 'h-9 px-3.5 text-[13px]',
-        variant === 'primary' && 'bg-accent text-ground hover:bg-[#3ddcf4]',
+        variant === 'primary' && 'bg-accent text-accent-ink hover:brightness-110',
         variant === 'outline' && 'border border-line-2 bg-raised/60 text-ink hover:bg-raised hover:border-ink-3',
         variant === 'ghost' && 'text-ink-2 hover:bg-raised hover:text-ink',
         variant === 'danger' && 'border border-danger/40 text-danger hover:bg-danger/10',
@@ -41,7 +41,7 @@ export function Segmented<T extends string>({ value, options, onChange, id, size
                 size === 'sm' && 'px-2.5 py-1 text-[12px]',
                 size === 'md' && 'px-3 py-1.5 text-[13px]',
                 size === 'lg' && 'px-4 py-2 text-[14px]',
-                active ? 'text-ground' : 'text-ink-2 hover:text-ink',
+                active ? 'text-accent-ink' : 'text-ink-2 hover:text-ink',
               )}
             >
               {active && <motion.span layoutId={`${id}-pill`} transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.8 }} className="absolute inset-0 rounded-full bg-accent" />}

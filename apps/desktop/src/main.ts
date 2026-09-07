@@ -89,10 +89,10 @@ function waitForHealth(port: number, timeoutMs = 120_000): Promise<void> {
 }
 
 function splash(): BrowserWindow {
-  const w = new BrowserWindow({ width: 420, height: 260, frame: false, resizable: false, show: true, backgroundColor: '#0b1016', webPreferences: { sandbox: true } })
-  const html = `<!doctype html><html><body style="margin:0;background:#0b1016;color:#e8edf2;font:14px Inter,system-ui;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px">
-  <svg width="44" height="44" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#151d27"/><path d="M4 24 L11 12 L15 18 L20 8 L28 24 Z" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linejoin="round"/><path d="M4 24 H28" stroke="#f5a524" stroke-width="2" stroke-linecap="round"/></svg>
-  <div style="font-weight:600;font-size:18px;letter-spacing:-0.01em">DepthWizard</div><div style="color:#7f8fa1">Starting the engine and loading the depth model</div></body></html>`
+  const w = new BrowserWindow({ width: 420, height: 260, frame: false, resizable: false, show: true, backgroundColor: '#14120f', webPreferences: { sandbox: true } })
+  const html = `<!doctype html><html><body style="margin:0;background:#14120f;color:#f2ede4;font:14px Inter,system-ui;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px">
+  <svg width="44" height="44" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2a2521"/><path d="M4 24 L11 12 L15 18 L20 8 L28 24 Z" fill="none" stroke="#e5a13c" stroke-width="2" stroke-linejoin="round"/><path d="M4 24 H28" stroke="#e5a13c" stroke-width="2" stroke-linecap="round"/></svg>
+  <div style="font-weight:600;font-size:18px;letter-spacing:-0.01em">DepthWizard</div><div style="color:#857c72">Starting the engine and loading the depth model</div></body></html>`
   w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
   return w
 }
@@ -120,7 +120,7 @@ async function createWindow(): Promise<void> {
     minWidth: 1100,
     minHeight: 680,
     show: false,
-    backgroundColor: '#0b1016',
+    backgroundColor: '#14120f',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: { preload: join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false },
   })

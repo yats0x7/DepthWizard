@@ -149,7 +149,7 @@ export function Terrain({ jobId, hf }: { jobId: string; hf: HeightField }) {
       />
       {wireframe && mode === 'analysis' && (
         <mesh geometry={built.geometry} frustumCulled={false}>
-          <meshBasicMaterial wireframe color="#22d3ee" transparent opacity={0.28} depthTest polygonOffset polygonOffsetFactor={-1} />
+          <meshBasicMaterial wireframe color="#e5a13c" transparent opacity={0.28} depthTest polygonOffset polygonOffsetFactor={-1} />
         </mesh>
       )}
     </group>

@@ -76,7 +76,7 @@ export function MapPanel() {
       attributionControl: { compact: true },
     })
     instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
-    const pin = new maplibregl.Marker({ color: '#22d3ee', draggable: true }).setLngLat(center).addTo(instance)
+    const pin = new maplibregl.Marker({ color: '#e5a13c', draggable: true }).setLngLat(center).addTo(instance)
     pin.on('dragend', () => {
       const p = pin.getLngLat()
       setCenter([p.lng, p.lat])
@@ -119,8 +119,8 @@ export function MapPanel() {
         return
       }
       instance.addSource('selection', { type: 'geojson', data: feature as never })
-      instance.addLayer({ id: 'selection-fill', type: 'fill', source: 'selection', paint: { 'fill-color': '#22d3ee', 'fill-opacity': 0.12 } })
-      instance.addLayer({ id: 'selection-line', type: 'line', source: 'selection', paint: { 'line-color': '#22d3ee', 'line-width': 2 } })
+      instance.addLayer({ id: 'selection-fill', type: 'fill', source: 'selection', paint: { 'fill-color': '#e5a13c', 'fill-opacity': 0.12 } })
+      instance.addLayer({ id: 'selection-line', type: 'line', source: 'selection', paint: { 'line-color': '#e5a13c', 'line-width': 2 } })
     }
     draw()
     map.current?.on('styledata', draw)

@@ -1,4 +1,4 @@
-import { Cpu, Plus } from 'lucide-react'
+import { Cpu, House } from 'lucide-react'
 import { useStore } from '../../store'
 import { JobList } from '../jobs/JobList'
 import { Button } from '../ui'
@@ -18,9 +18,9 @@ export function Brand({ className }: { className?: string }) {
 }
 
 /**
- * The sidebar is history, not a second front door. The old build mounted the dropzone and the
- * sample list here *and* on the landing at the same time, which is why there were five ways in
- * and no obvious one.
+ * The sidebar is history and the way home, not a second front door. The old build mounted the
+ * dropzone and the sample list here *and* on the landing at the same time, which is why there were
+ * five ways in and no obvious one — and then, once a model was open, no way back out at all.
  */
 export function Sidebar() {
   const system = useStore((s) => s.system)
@@ -31,7 +31,10 @@ export function Sidebar() {
   return (
     <aside className="flex h-full w-[268px] shrink-0 flex-col border-r border-line bg-panel 2xl:w-[300px]">
       <div className="flex items-center justify-between px-4 pb-3 pt-4">
-        <Brand />
+        {/* The wordmark is the way home, the way it is on every site anyone has ever used. */}
+        <button onClick={() => openJob(null)} title="Back to the start page" className="rounded-md text-left hover:opacity-80">
+          <Brand />
+        </button>
         <span
           className={cn('flex items-center gap-1.5 text-[12px]', online ? 'text-ink-3' : 'text-danger')}
           title={system ? `${system.torch} on ${system.device}` : 'engine offline'}
@@ -42,8 +45,8 @@ export function Sidebar() {
       </div>
       {hasJob && (
         <div className="px-3 pb-3">
-          <Button variant="primary" className="w-full" onClick={() => openJob(null)}>
-            <Plus size={15} /> New run
+          <Button variant="primary" className="w-full" onClick={() => openJob(null)} title="Samples, your own image, and the map picker">
+            <House size={15} /> Home
           </Button>
         </div>
       )}

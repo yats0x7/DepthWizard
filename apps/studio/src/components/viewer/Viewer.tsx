@@ -42,7 +42,7 @@ export function Viewer() {
       camera={{ fov: 58, near: 0.05, far: 5000, position: [dims.sx * 0.55, dims.size * 0.42, dims.sz * 0.75] }}
       onCreated={({ gl, size }) => {
         if (import.meta.env.DEV) console.info('[dw] canvas', size.width, size.height)
-        gl.setClearColor('#0e141b')
+        gl.setClearColor('#14120f')
         gl.domElement.addEventListener('webglcontextlost', (e) => {
           e.preventDefault()
           console.warn('WebGL context lost; waiting for restore')

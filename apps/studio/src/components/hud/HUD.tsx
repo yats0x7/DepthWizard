@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Crosshair, Eye, Layers, Lock, Mountain, MousePointer2, Navigation } from 'lucide-react'
+import { ArrowLeft, Crosshair, Eye, Layers, Lock, Mountain, MousePointer2, Navigation } from 'lucide-react'
 import { useStore } from '../../store'
 import { useTelemetry } from '../../lib/useTelemetry'
 import { compass, fmt } from '../../lib/format'
@@ -68,11 +68,11 @@ function CompassRose() {
         <svg viewBox="0 0 44 44" className="h-11 w-11">
           <circle cx="22" cy="22" r="20" fill="none" stroke="currentColor" className="text-line-2" strokeWidth="1" />
           <g style={{ transform: `rotate(${-t.heading}deg)`, transformOrigin: '22px 22px', transition: 'transform 120ms linear' }}>
-            <polygon points="22,5 25.5,22 22,19 18.5,22" fill="#f26d6d" />
-            <polygon points="22,39 25.5,22 22,25 18.5,22" fill="#7f8fa1" />
-            <text x="22" y="4" textAnchor="middle" fontSize="6" fill="#e8edf2" fontFamily="Inter Variable">N</text>
+            <polygon points="22,5 25.5,22 22,19 18.5,22" fill="#e8705d" />
+            <polygon points="22,39 25.5,22 22,25 18.5,22" fill="#857c72" />
+            <text x="22" y="4" textAnchor="middle" fontSize="6" fill="#f2ede4" fontFamily="Inter Variable">N</text>
           </g>
-          <polygon points="22,1 24,6 20,6" fill="#22d3ee" />
+          <polygon points="22,1 24,6 20,6" fill="#e5a13c" />
         </svg>
       </div>
       <div className="flex flex-col gap-0.5 leading-none">
@@ -127,7 +127,7 @@ function Minimap() {
     ctx.clearRect(0, 0, W, H)
     if (img.current) ctx.drawImage(img.current, 0, 0, W, H)
     else {
-      ctx.fillStyle = '#151d27'
+      ctx.fillStyle = '#211d19'
       ctx.fillRect(0, 0, W, H)
     }
     const [col, row] = worldToPixel(hf, t.x, t.z)
@@ -142,14 +142,14 @@ function Minimap() {
     ctx.moveTo(0, 0)
     ctx.arc(0, 0, 26, -Math.PI / 2 - 0.5, -Math.PI / 2 + 0.5)
     ctx.closePath()
-    ctx.fillStyle = 'rgba(34, 211, 238, 0.28)'
+    ctx.fillStyle = 'rgba(229, 161, 60, 0.30)'
     ctx.fill()
     ctx.restore()
     ctx.beginPath()
     ctx.arc(px, py, 3.5, 0, Math.PI * 2)
-    ctx.fillStyle = '#22d3ee'
+    ctx.fillStyle = '#e5a13c'
     ctx.fill()
-    ctx.strokeStyle = '#0b1016'
+    ctx.strokeStyle = '#14120f'
     ctx.lineWidth = 1.5
     ctx.stroke()
   }, [t, hf])
@@ -251,7 +251,15 @@ export function HUD() {
         )}
       </div>
 
-      <div className="absolute left-4 top-4 flex flex-col gap-2">
+      <div className="absolute left-4 top-4 flex flex-col items-start gap-2">
+        {/* Always reachable, including with the side panels hidden. */}
+        <button
+          onClick={() => useStore.getState().openJob(null)}
+          title="Back to the start page"
+          className="hud-chip pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 text-[12.5px] text-ink-2 transition-colors hover:text-ink"
+        >
+          <ArrowLeft size={14} /> Home
+        </button>
         <div className={cn('hud-chip flex items-center gap-2 px-2.5 py-1.5 text-[12px]', exaggeration !== 1 ? 'text-accent' : 'text-ink-2')}>
           <Mountain size={14} />
           <span className="num">×{exaggeration.toFixed(2)}</span>
